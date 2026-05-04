@@ -612,6 +612,29 @@ body {
   font-weight: 700;
   z-index: 2;
 }
+.avatar-upload-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.9);
+  border: 2px solid #e0e0e0;
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  z-index: 10;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+.avatar-upload-btn:hover {
+  background: white;
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
 .pet-name {
   font-size: 20px;
   font-weight: 800;
@@ -1452,59 +1475,334 @@ input:checked + .slider:before {
   margin: 0;
 }
 
-/* 快速登录区 */
-.quick-login {
-  margin-bottom: 16px;
+/* ============================================================
+   登录页整体布局
+   .login-page → flex-column，撑满全屏
+   .login-main  → 双栏（桌面：左登录卡+右选择器 / 移动：垂直堆叠）
+   ============================================================ */
+
+/* 主内容区：登录卡片 + 右侧快速选择器 */
+.login-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;   /* 默认竖屏：上下排列 */
+  gap: 16px;
+  padding: 16px 16px 0;
+  overflow: hidden;
+  min-height: 0;
 }
-.quick-login-title {
-  font-size: 12px;
-  color: var(--text-light);
-  margin-bottom: 10px;
+
+/* 桌面横屏：双栏布局 */
+@media (min-width: 768px) {
+  .login-main {
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 24px 24px 0;
+    gap: 24px;
+  }
+}
+
+/* 桌面横屏：登录卡片固定宽度，侧边栏模式 */
+@media (min-width: 768px) {
+  .login-card {
+    width: 360px;
+    flex-shrink: 0;
+  }
+}
+
+/* 学生Tab下无账号时的提示 */
+.login-empty-tip {
   text-align: center;
+  padding: 24px 16px;
+  color: var(--text-light);
+  font-size: 13px;
+  line-height: 1.6;
 }
-.quick-login-grid {
+
+/* ============================================================
+   登录页主内容区（双栏布局）
+   竖屏：垂直堆叠；横屏(≥768px)：左卡片+右选择器
+   ============================================================ */
+.login-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px 14px 0;
+  overflow: hidden;
+  min-height: 0;
+}
+@media (min-width: 768px) {
+  .login-main {
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 20px 24px 0;
+    gap: 20px;
+  }
+  .login-card { width: 360px; flex-shrink: 0; }
+}
+
+/* 无学生账号时的提示 */
+.login-empty-tip {
+  text-align: center;
+  padding: 20px 12px;
+  color: var(--text-light);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* ============================================================
+   快速登录选择器面板（ql-panel）
+   独立于登录卡片，在页面主区域内全高滚动
+   ============================================================ */
+
+/* 整体面板（桌面横屏右侧 / 竖屏独立一栏） */
+.ql-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 200px;
+  max-height: calc(100vh - 180px);  /* 桌面限制高度，全屏滚动 */
+  background: #FAFAFE;
+  border: 1.5px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+/* 面板标题 */
+.ql-panel-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-light);
+  text-align: center;
+  padding: 10px 0 4px;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+/* 搜索框（sticky 固定在面板顶部） */
+.ql-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px 8px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #FAFAFE;
+  flex-shrink: 0;
+}
+.ql-search-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+  color: var(--text-light);
+}
+.ql-search-input {
+  flex: 1;
+  height: 36px;
+  padding: 0 12px;
+  border: 2px solid var(--border);
+  border-radius: 50px;
+  background: white;
+  font-size: 13px;
+  color: var(--text-dark);
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  min-width: 0;
+}
+.ql-search-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(107,99,255,0.1);
+}
+.ql-search-clear {
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  border: none;
+  background: #E0DDF5;
+  color: var(--text-mid);
+  font-size: 11px;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.2s;
+  padding: 0;
+}
+.ql-search-clear:hover { background: var(--primary); color: white; }
+
+/* 首字母索引条（横向可滚动药丸） */
+.ql-index-bar {
+  display: flex;
+  flex-direction: row;
+  gap: 5px;
+  overflow-x: auto;
+  padding: 0 10px 8px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  flex-shrink: 0;
+}
+.ql-index-bar::-webkit-scrollbar { display: none; }
+
+.ql-index-btn {
+  flex-shrink: 0;
+  padding: 3px 9px;
+  border-radius: 20px;
+  border: 1.5px solid var(--border);
+  background: white;
+  color: var(--text-mid);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+  line-height: 1.4;
+}
+.ql-index-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.ql-index-btn.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+  transform: scale(1.1);
+}
+
+/* 可滚动卡片区域 */
+.ql-scroll-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 10px 12px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(107,99,255,0.2) transparent;
+  min-height: 0;
+}
+.ql-scroll-area::-webkit-scrollbar { width: 4px; }
+.ql-scroll-area::-webkit-scrollbar-thumb {
+  background: rgba(107,99,255,0.2);
+  border-radius: 4px;
+}
+
+/* 分组容器 */
+.ql-group {
+  margin-bottom: 14px;
+  scroll-margin-top: 4px;
+}
+
+/* 分组标题行 */
+.ql-group-header {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 0 6px;
+  border-bottom: 1.5px solid rgba(107,99,255,0.12);
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.ql-group-header:hover {
+  opacity: 0.7;
+}
+.ql-group-badge {
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: white;
+  font-size: 10px;
+  font-weight: 900;
+  display: inline-flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.ql-group-name {
+  font-size: 12px;
+  font-weight: 900;
+  color: var(--primary);
+}
+.ql-group-count {
+  font-size: 10px;
+  color: var(--text-light);
+  font-weight: 400;
+}
+
+/* 3列网格 */
+.ql-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
 }
-.quick-login-item {
+
+/* 学生卡片 */
+.ql-card {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 12px 8px;
-  background: #F8F5FF;
-  border: 2px solid transparent;
-  border-radius: 12px;
+  padding: 10px 6px 8px;
+  background: white;
+  border: 2px solid var(--border);
+  border-radius: 10px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+  will-change: transform;
 }
-.quick-login-item:hover {
+.ql-card:hover {
   border-color: var(--primary);
-  background: #EDE7F6;
-  transform: translateY(-2px);
+  background: #F0ECFF;
+  transform: translateY(-3px);
+  box-shadow: 0 5px 14px rgba(107,99,255,0.18);
 }
-.quick-login-avatar {
-  width: 40px;
-  height: 40px;
+.ql-card:active { transform: scale(0.94); }
+
+/* 头像圆圈 */
+.ql-avatar {
+  width: 36px; height: 36px;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--primary), var(--secondary));
   color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
   font-weight: 700;
-  margin-bottom: 6px;
+  margin-bottom: 5px;
+  flex-shrink: 0;
 }
-.quick-login-name {
+.ql-name {
   font-size: 12px;
   font-weight: 700;
   color: var(--text-dark);
-  margin-bottom: 2px;
+  margin-bottom: 1px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+  text-align: center;
 }
-.quick-login-class {
+.ql-class {
   font-size: 10px;
   color: var(--text-light);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+  text-align: center;
+}
+
+/* 无结果提示 */
+.ql-no-result {
+  text-align: center;
+  padding: 24px 0;
+  color: var(--text-light);
+  font-size: 13px;
+}
+
+/* 桌面横屏：选择器面板更大 */
+@media (min-width: 768px) {
+  .ql-panel {
+    max-height: calc(100vh - 140px);
+    min-width: 360px;
+  }
+  .ql-scroll-area {
+    max-height: calc(100vh - 240px);
+  }
 }
 
 /* 演示账号提示 */
@@ -1566,4 +1864,471 @@ input:checked + .slider:before {
   cursor: pointer;
   z-index: 1;
 }
+
+
+/* ============================================================
+   学生选择器（Picker）专用样式
+   竖屏：搜索框 → 首字母横向滚动 → 3列卡片 → 排行榜
+   横屏（≥768px）：左侧竖排索引 + 学生列表 | 右侧排行榜
+   ============================================================ */
+
+/* 整页容器 */
+.picker-page {
+  min-height: 100vh;
+  background: var(--bg-main);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- 标题区 ---- */
+.picker-header {
+  text-align: center;
+  padding: 20px 20px 10px;
+  flex-shrink: 0;
+}
+.picker-logo   { font-size: 36px; margin-bottom: 6px; }
+.picker-title  { font-size: 22px; font-weight: 900; color: var(--text-dark); margin: 0 0 4px; }
+.picker-subtitle { font-size: 13px; color: var(--text-light); margin: 0; }
+
+/* ---- 空状态 ---- */
+.picker-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.picker-empty-card {
+  background: white;
+  border: 2px solid var(--border);
+  border-radius: 20px;
+  padding: 32px 24px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+  text-align: center;
+  width: 100%;
+  max-width: 360px;
+}
+.picker-empty-icon   { font-size: 48px; margin-bottom: 16px; }
+.picker-empty-title  { font-size: 18px; font-weight: 900; color: var(--text-dark); margin: 0 0 8px; }
+.picker-empty-desc   { font-size: 14px; color: var(--text-mid); line-height: 1.6; margin: 0 0 20px; }
+.picker-empty-actions { display: flex; flex-direction: column; gap: 10px; }
+
+/* ---- 搜索框（sticky 固定顶部）---- */
+.picker-search-wrap {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--bg-main);
+  padding: 8px 14px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.picker-search-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+  color: var(--text-light);
+}
+.picker-search-input {
+  flex: 1;
+  height: 40px;
+  padding: 0 14px;
+  border: 2px solid var(--border);
+  border-radius: 50px;
+  background: white;
+  font-size: 14px;
+  color: var(--text-dark);
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.picker-search-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(107,99,255,0.1);
+}
+.picker-search-clear {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  border: none;
+  background: var(--border);
+  color: var(--text-mid);
+  font-size: 12px;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.2s;
+}
+.picker-search-clear:hover { background: var(--primary); color: white; }
+
+/* ---- 主体 flex 容器 ---- */
+.picker-body {
+  flex: 1;
+  display: flex;
+  overflow: hidden;           /* 让子区域独立滚动 */
+  gap: 0;
+}
+
+/* ---- 主区（左列：索引条 + 卡片）---- */
+.picker-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  min-width: 0;
+}
+
+/* ---- 首字母索引条 ---- */
+.picker-index-bar {
+  /* 竖屏：横向可滚动药丸 */
+  display: flex;
+  flex-direction: row;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 8px 14px 6px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  flex-shrink: 0;
+  background: var(--bg-main);
+  /* sticky 在 .picker-main 滚动容器内不生效，改为静态 */
+}
+.picker-index-bar::-webkit-scrollbar { display: none; }
+
+/* 横屏模式：索引条变成左侧竖排 */
+.picker-index-vertical {
+  flex-direction: column;
+  overflow-x: unset;
+  overflow-y: auto;
+  padding: 8px 0 8px 8px;
+  width: 36px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  gap: 2px;
+}
+
+.picker-index-btn {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1.5px solid var(--border);
+  background: white;
+  color: var(--text-mid);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s;
+  line-height: 1;
+  white-space: nowrap;
+}
+.picker-index-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: rgba(107,99,255,0.06);
+}
+.picker-index-btn.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+  transform: scale(1.08);
+}
+
+/* 横屏时索引条按钮：更紧凑圆形 */
+.picker-index-vertical .picker-index-btn {
+  padding: 5px 0;
+  border-radius: 50%;
+  width: 26px; height: 26px;
+  text-align: center;
+  font-size: 11px;
+  border-width: 1.5px;
+}
+
+/* ---- 横屏时 .picker-main 改为 row 布局 ---- */
+@media (min-width: 768px) {
+  .picker-main {
+    flex-direction: row;
+  }
+}
+
+/* ---- 分组卡片区 ---- */
+.picker-groups {
+  flex: 1;
+  padding: 6px 14px 16px;
+  overflow-y: auto;     /* 竖屏下此区域自己滚动 */
+}
+@media (min-width: 768px) {
+  .picker-groups {
+    overflow-y: auto;
+    max-height: calc(100vh - 160px);  /* 横屏高度限制 */
+  }
+}
+
+/* 分组容器 */
+.picker-group {
+  margin-bottom: 20px;
+  scroll-margin-top: 8px;
+}
+
+/* 分组标题行 */
+.picker-group-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 0 6px;
+  border-bottom: 1.5px solid rgba(107,99,255,0.15);
+  margin-bottom: 10px;
+}
+.picker-group-badge {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: white;
+  font-size: 11px;
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.picker-group-name {
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--primary);
+}
+.picker-group-count {
+  font-size: 11px;
+  color: var(--text-light);
+  font-weight: 400;
+  margin-left: 2px;
+}
+
+/* 3列网格 */
+.picker-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+/* 学生卡片 */
+.picker-card {
+  background: white;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 6px 8px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+  will-change: transform;
+}
+.picker-card:hover {
+  border-color: var(--primary);
+  transform: translateY(-3px);
+  box-shadow: 0 6px 18px rgba(107,99,255,0.18);
+}
+.picker-card:active {
+  transform: scale(0.95);
+}
+.picker-card-avatar {
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  overflow: hidden;
+  margin: 0 auto 7px;
+  background: linear-gradient(135deg, #F0ECFF, #E8E4FF);
+  display: flex; align-items: center; justify-content: center;
+  border: 2px solid rgba(107,99,255,0.15);
+}
+.picker-card-avatar img {
+  width: 100%; height: 100%; object-fit: cover;
+}
+.picker-card-initial {
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--primary);
+  line-height: 1;
+}
+.picker-card-name {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text-dark);
+  margin-bottom: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.picker-card-class {
+  font-size: 10px;
+  color: var(--text-light);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- 无搜索结果 ---- */
+.picker-no-result {
+  text-align: center;
+  padding: 40px 0;
+  color: var(--text-light);
+  font-size: 14px;
+}
+.picker-no-result-icon { font-size: 32px; margin-bottom: 8px; }
+
+/* ---- 右侧排行榜侧边栏（横屏专属）---- */
+.picker-sidebar {
+  width: 210px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  padding: 12px 12px 12px 10px;
+  border-left: 1px solid var(--border);
+  max-height: calc(100vh - 160px);
+}
+
+.picker-rank-section { margin-bottom: 18px; }
+
+.picker-rank-title {
+  font-size: 12px;
+  font-weight: 900;
+  margin-bottom: 8px;
+  padding-bottom: 5px;
+  border-bottom-width: 1.5px;
+  border-bottom-style: solid;
+}
+.picker-rank-title--points {
+  color: var(--primary);
+  border-bottom-color: rgba(107,99,255,0.2);
+}
+.picker-rank-title--pet {
+  color: #4CAF50;
+  border-bottom-color: rgba(76,175,80,0.2);
+}
+
+.picker-rank-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(0,0,0,0.04);
+}
+.picker-rank-num {
+  font-size: 11px;
+  font-weight: 900;
+  color: var(--text-light);
+  width: 16px;
+  flex-shrink: 0;
+  text-align: center;
+}
+.picker-rank-num.rank-top { color: var(--accent); }
+.picker-rank-avatar {
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--bg-card);
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--primary);
+  border: 1px solid var(--border);
+}
+.picker-rank-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.picker-rank-emoji { font-size: 18px; flex-shrink: 0; }
+.picker-rank-info { flex: 1; min-width: 0; }
+.picker-rank-name {
+  font-size: 12px; font-weight: 700;
+  color: var(--text-dark);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.picker-rank-score { font-size: 10px; color: var(--text-light); }
+
+/* ---- 竖屏底部排行榜 ---- */
+.picker-mobile-ranks {
+  padding: 16px 14px;
+  border-top: 1px solid var(--border);
+  background: white;
+  flex-shrink: 0;
+}
+.picker-mrank-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.picker-mrank-block {}
+.picker-mrank-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(0,0,0,0.04);
+  font-size: 12px;
+}
+.picker-mrank-num {
+  width: 14px;
+  font-weight: 900;
+  color: var(--text-light);
+  flex-shrink: 0;
+  text-align: center;
+}
+.picker-mrank-emoji { font-size: 14px; flex-shrink: 0; }
+.picker-mrank-name {
+  flex: 1; min-width: 0;
+  font-weight: 700;
+  color: var(--text-dark);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.picker-mrank-score {
+  font-size: 11px;
+  color: var(--text-light);
+  flex-shrink: 0;
+}
+
+/* ---- 版权尾 ---- */
+.picker-footer {
+  text-align: center;
+  padding: 10px;
+  font-size: 11px;
+  color: var(--text-light);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+/* ---- 横屏布局覆盖（≥768px）---- */
+@media (min-width: 768px) {
+  .picker-header { padding: 16px 20px 8px; }
+  .picker-logo   { font-size: 32px; }
+  .picker-title  { font-size: 20px; }
+
+  /* 主体高度限制，让搜索框固定在顶部时能正确滚动 */
+  .picker-body {
+    height: calc(100vh - 120px);
+    overflow: hidden;
+  }
+
+  /* 索引条在横屏固定在 .picker-main 内左侧 */
+  .picker-index-bar.picker-index-vertical {
+    position: sticky;
+    top: 0;
+    align-self: flex-start;
+    max-height: calc(100vh - 160px);
+    overflow-y: auto;
+  }
+
+  /* 横屏不显示底部排行榜（改为侧边栏） */
+  .picker-mobile-ranks { display: none; }
+
+  /* 3列网格在横屏保持3列（卡片更大） */
+  .picker-grid { gap: 10px; }
+  .picker-card-avatar { width: 52px; height: 52px; }
+  .picker-card-initial { font-size: 24px; }
+  .picker-card-name { font-size: 13px; }
+}
+
+/* ---- 手机竖屏优化（≤480px）---- */
+@media (max-width: 480px) {
+  .picker-card-avatar { width: 42px; height: 42px; }
+  .picker-card-initial { font-size: 19px; }
+  .picker-card-name  { font-size: 12px; }
+  .picker-grid { gap: 6px; }
+  .picker-groups { padding: 6px 10px 16px; }
+  .picker-search-wrap { padding: 6px 10px 8px; }
+  .picker-mrank-row { grid-template-columns: 1fr; }
+}
+
 

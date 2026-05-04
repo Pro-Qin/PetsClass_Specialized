@@ -243,6 +243,14 @@ const Store = {
     CloudSync.pushAuditLog(this.state.auditLog).catch(() => {});
   },
 
+  // ---- 自动同步到云端（异步，不阻塞主操作）----
+  _autoSyncToCloud() {
+    // 异步推送到云端，静默失败
+    CloudSync.pushToCloud().catch(err => {
+      console.warn('[Store] 自动同步到云端失败:', err.message);
+    });
+  },
+
   // ---- 操作日志：从云端拉取（优先），降级到 localStorage ----
   async _loadAuditLog() {
     // 优先从云端拉取（1000条完整记录）
@@ -489,7 +497,6 @@ const Store = {
       clean: 100
     };
     student.petDead = false;
-    student.petHatchProgress = 0;
 
     // 同步到本地存储（DEBUG 模式不保存）
     if (!DEBUG_MODE) {
@@ -528,6 +535,44 @@ const Store = {
       return { success: true };
     } catch (err) {
       return { success: false, msg: '保存失败' };
+    }
+  },
+
+  // ---- 复活宠物（喂食复活，经验清零，状态全满）----
+  async revivePet(studentId) {
+    const student = this.state.students.find(s => s.id === studentId);
+    if (!student) return { success: false, msg: '学生不存在' };
+    if (!student.petDead) return { success: false, msg: '宠物还活着，不需要复活' };
+
+    // 复活宠物
+    student.petDead = false;
+    student.petExp = 0;           // 经验清零
+    student.petStage = 0;         // 等级重置
+    student.deathTime = null;      // 清除死亡时间
+    
+    // 恢复状态
+    student.petStatus = {
+      health: 100,
+      hungry: 100,
+      happy: 100,
+      clean: 100
+    };
+
+    // 记录复活日志
+    this._logAudit('复活宠物', `复活了「${student.name}」的宠物「${student.petName}」（经验已重置）`, null);
+
+    try {
+      if (!DEBUG_MODE) {
+        await dbStorage.storeStudents(this.state.students);
+        console.log('宠物复活数据已同步到本地存储');
+        // 自动同步到云端
+        this._autoSyncToCloud();
+      } else {
+        console.log('DEBUG 模式：宠物复活不持久化');
+      }
+      return { success: true, student };
+    } catch (err) {
+      return { success: false, msg: '复活失败' };
     }
   },
 
@@ -612,28 +657,25 @@ const Store = {
         delete student.backpack[itemId];
       }
 
+
       let levelUp = false;
       let newStage = student.petStage || 1;
-      let hatched = false;
-      let hatchProgress = student.petHatchProgress || 0;
+      let recovered = false;
 
+      // 宠物死亡状态下，喂食复活（经验清零）
       if (student.petDead) {
-        // 宠物死亡状态下，喂食推进孵化进度
         if (item.type === 'food') {
-          hatchProgress++;
-          student.petHatchProgress = hatchProgress;
-          if (hatchProgress >= 3) {
-            // 孵化完成
-            hatched = true;
-            student.petDead = false;
-            student.petHatchProgress = 0;
-            student.petStatus = {
-              health: 100,
-              hungry: 100,
-              happy: 100,
-              clean: 100
-            };
-          }
+          recovered = true;
+          student.petDead = false;
+          student.petExp = 0;           // 经验清零
+          student.petStage = 0;         // 等级重置
+          student.deathTime = null;     // 清除死亡时间
+          student.petStatus = {
+            health: 100,
+            hungry: 100,
+            happy: 100,
+            clean: 100
+          };
         }
       } else {
         // 宠物存活状态下，应用道具效果
@@ -669,6 +711,8 @@ const Store = {
       if (!DEBUG_MODE) {
         await dbStorage.storeStudents(this.state.students);
         console.log('道具使用数据已同步到本地存储');
+        // 自动同步到云端
+        this._autoSyncToCloud();
       } else {
         console.log('DEBUG 模式：道具使用不持久化');
       }
@@ -678,8 +722,7 @@ const Store = {
         success: true,
         levelUp,
         newStage,
-        hatched,
-        hatchProgress,
+        recovered,
         item,
         expMsg: '',
         student,   // ← 直接返回最新的学生对象
@@ -821,11 +864,17 @@ const Store = {
           if (!DEBUG_MODE) {
             await dbStorage.storeStudents(this.state.students);
             console.log('任务审核数据已同步到本地存储');
+            // 自动同步到云端
+            this._autoSyncToCloud();
           }
         }
         return { success: true, awarded: true };
       }
-      if (!DEBUG_MODE) console.log('任务审核数据已同步到本地存储');
+      if (!DEBUG_MODE) {
+        console.log('任务审核数据已同步到本地存储');
+        // 自动同步到云端
+        this._autoSyncToCloud();
+      }
       return { success: true, awarded: false };
     } catch (err) {
       console.warn('审核任务失败:', err);
@@ -932,7 +981,6 @@ const Store = {
           clean: 100
         },
         petDead: false,
-        petHatchProgress: 0,
         backpack: {},
         joinDate: new Date().toLocaleString('zh-CN')
       };
@@ -1079,20 +1127,47 @@ const Store = {
     console.log('用户已登出');
   },
 
+  // ========= 教师账号持久化 =========
+  // 教师账号存于 localStorage，key='teacherAccounts'，首次加载时用 TEACHER_ACCOUNTS 兜底
+
+  _getTeacherAccounts() {
+    try {
+      const raw = localStorage.getItem('teacherAccounts');
+      if (raw) return JSON.parse(raw);
+    } catch(e) {}
+    // 首次：从 data.js 的 TEACHER_ACCOUNTS 初始化
+    const defaults = (typeof TEACHER_ACCOUNTS !== 'undefined') ? TEACHER_ACCOUNTS : [];
+    localStorage.setItem('teacherAccounts', JSON.stringify(defaults));
+    return defaults;
+  },
+
+  _saveTeacherAccounts(accounts) {
+    try { localStorage.setItem('teacherAccounts', JSON.stringify(accounts)); } catch(e) {}
+  },
+
   // ========= 管理员专用方法 =========
 
   async getTeachers() {
-    // 本地实现：返回空数组，因为本地存储版不需要教师管理
-    return [];
+    return this._getTeacherAccounts().map(t => ({ ...t, password: undefined }));
   },
 
   async deleteTeacher(teacherId) {
-    // 本地实现：返回成功，因为本地存储版不需要教师管理
+    const accounts = this._getTeacherAccounts().filter(t => t.id !== teacherId);
+    this._saveTeacherAccounts(accounts);
     return { success: true };
   },
 
   async resetTeacherPassword(teacherId, newPassword) {
-    // 本地实现：返回成功，因为本地存储版不需要教师管理
+    const accounts = this._getTeacherAccounts();
+    const idx = accounts.findIndex(t => t.id === teacherId);
+    if (idx < 0) return { success: false, msg: '教师不存在' };
+    accounts[idx].password = newPassword;
+    this._saveTeacherAccounts(accounts);
+    // 同步更新 data.js 中的 TEACHER_ACCOUNTS（内存），下次页面刷新前生效
+    if (typeof TEACHER_ACCOUNTS !== 'undefined') {
+      const orig = TEACHER_ACCOUNTS.find(t => t.id === teacherId);
+      if (orig) orig.password = newPassword;
+    }
     return { success: true };
   },
 
@@ -1126,6 +1201,8 @@ const Store = {
         if (!DEBUG_MODE) {
           await dbStorage.storeStudents(this.state.students);
           console.log('学生密码重置数据已同步到本地存储');
+          // 自动同步到云端
+          this._autoSyncToCloud();
         }
         return { success: true };
       } else {
@@ -1285,6 +1362,8 @@ const Store = {
       Vue.delete(student, 'avatar');
     }
     if (!DEBUG_MODE) await dbStorage.storeStudents(this.state.students);
+    // 自动同步到云端
+    this._autoSyncToCloud();
     return true;
   },
 
@@ -1499,6 +1578,8 @@ const Store = {
       if (!DEBUG_MODE) {
         await dbStorage.storeStudents(this.state.students);
         console.log('宠物状态衰减数据已同步到本地存储');
+        // 自动同步到云端
+        this._autoSyncToCloud();
       } else {
         console.log('DEBUG 模式：宠物衰减不持久化');
       }
@@ -1513,7 +1594,7 @@ const Store = {
   },
 
   // ---- 离线惩罚检测（登录时触发）----
-  // 阶梯积分扣减：24h→-10, 48h→-30, 72h→-60, 96h→-100, 120h→-150, 144h→-200, 168h(7天)→死亡+清零
+  // 阶梯积分扣减：24h→-10, 48h→-30, 72h→-60, 96h→-100, 120h→-150, 144h→-200, 336h(14天)→死亡+清零
   async checkDailyPenalty(studentId) {
     try {
       const student = this.state.students.find(s => s.id === studentId);
@@ -1539,10 +1620,12 @@ const Store = {
       let pointPenalty = 0;
 
       // 计算惩罚积分
-      if (hoursMissed >= 168) {
-        // 7天以上，宠物死亡
+      if (hoursMissed >= 336) {
+        // 14天以上，宠物死亡
         student.petDead = true;
         student.petHatchProgress = 0;
+        // 记录死亡时间
+        student.deathTime = new Date().toISOString();
         const pointLost = student.points || 0;
         student.points = 0;
         
@@ -1652,6 +1735,28 @@ const Store = {
       return { success: false, msg: '更新失败' };
     }
   },
+  // ---- 云端同步：仅推送头像 ----
+  async cloudPushAvatars() {
+    const result = await CloudSync.pushAvatarsOnly();
+    if (result.success) {
+      this.toast('🖼️ ' + result.msg, 'success');
+    } else {
+      this.toast('🖼️ 上传失败: ' + result.msg, 'error');
+    }
+    return result;
+  },
+
+  // ---- 云端同步：仅恢复头像 ----
+  async cloudPullAvatars() {
+    const result = await CloudSync.pullAvatarsOnly();
+    if (result.success) {
+      this.toast('🖼️ ' + result.msg, 'success');
+    } else {
+      this.toast('🖼️ 恢复失败: ' + result.msg, 'error');
+    }
+    return result;
+  },
+
   // ---- 云端同步：推送到云端 ----
   async cloudPush() {
     const result = await CloudSync.pushToCloud();

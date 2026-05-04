@@ -5,49 +5,51 @@
 // 等级0-2→外观0(蛋), 3-7→外观1(幼宠), 8-11→外观2, 12-15→外观3, 16-18→外观4, 19-20→外观5
 // 注：已移除"刚出壳"第2阶段，避免误解
 const PET_TYPES = [
-  { id: 'dragon', name: '小火龙', emoji: '🐲', egg: '🥚', stages: ['🥚','🦎','🐲','🐉','🔥','⚡'] },
-  { id: 'cat',    name: '星星猫', emoji: '🐱', egg: '🥚', stages: ['🥚','🐱','😸','🦁','🌟','✨'] },
-  { id: 'bunny',  name: '棉花兔', emoji: '🐰', egg: '🥚', stages: ['🥚','🐰','🐇','🦊','🌸','💫'] },
-  { id: 'bird',   name: '彩翼鸟', emoji: '🐦', egg: '🥚', stages: ['🥚','🐦','🦜','🦅','🌈','🪄'] },
-  { id: 'dog',    name: '旺财狗', emoji: '🐶', egg: '🥚', stages: ['🥚','🐶','🐕','🦴','🎖️','👑'] },
-  { id: 'fairy',  name: '梦精灵', emoji: '🧚', egg: '🥚', stages: ['🥚','🧚','✨','🌟','🎇','🌠'] },
+  { id: 'dragon', name: '小火龙', emoji: '🐲', stages: ['🦎','🐲','🐉','🔥','⚡'] },
+  { id: 'cat',    name: '星星猫', emoji: '🐱', stages: ['🐱','😸','🦁','🌟','✨'] },
+  { id: 'bunny',  name: '棉花兔', emoji: '🐰', stages: ['🐰','🐇','🦊','🌸','💫'] },
+  { id: 'bird',   name: '彩翼鸟', emoji: '🐦', stages: ['🐦','🦜','🦅','🌈','🪄'] },
+  { id: 'dog',    name: '旺财狗', emoji: '🐶', stages: ['🐶','🐕','🦴','🎖️','👑'] },
+  { id: 'fairy',  name: '梦精灵', emoji: '🧚', stages: ['🧚','✨','🌟','🎇','🌠'] },
+  { id: 'hamster', name: '小仓鼠', emoji: '🐹', stages: ['🐹','🐹','🐹','🐹','🐹'] },
+  { id: 'fox',    name: '小狐狸', emoji: '🦊', stages: ['🦊','🦊','🦊','🦊','🦊'] },
+  { id: 'deer',   name: '小鹿', emoji: '🦌', stages: ['🦌','🦌','🦌','🦌','🦌'] },
+  { id: 'pig',    name: '小猪', emoji: '🐖', stages: ['🐖','🐖','🐖','🐖','🐖'] },
+  { id: 'wolf',   name: '小狼', emoji: '🐺', stages: ['🐺','🐺','🐺','🐺','🐺'] },
+  { id: 'spider', name: '小蜘蛛', emoji: '🕷️', stages: ['🕷️','🕷️','🕷️','🕷️','🕷️'] },
+  { id: 'penguin', name: '小企鹅', emoji: '🐧', stages: ['🐧','🐧','🐧','🐧','🐧'] },
 ];
 
 // 每日经验上限配置（宠物每天最多获得的经验值）
-// 设定为 200 exp/天，每天喂食、洗澡、玩耍等护理行为才能累计经验，积分不再直接转化为经验
-const DAILY_EXP_LIMIT = 200;
+// 设定为 1000 exp/天
+const DAILY_EXP_LIMIT = 1000;
 
 // 宠物成长阶段（共20级，设计为小学6年可持续成长）
-// 经验需求说明：
-//   宠物每天最多获得 50 exp（通过喂食/洗澡/玩耍等护理行为积累）
-//   全程约 6 年（45000 exp ÷ 50 exp/天 ≈ 900天，约2.5学年）
-//   注意：积分仅用于购买道具，不能直接转化为宠物经验
-// 注：已移除 level 1 "刚出壳" 阶段，level 0 为蛋，level 2 为幼宠
+// 已移除蛋阶段，level 0 起始即为幼宠
 const GROWTH_STAGES = [
-  { level:  0, name: '蛋',      minExp: 0,     maxExp: 100   },
-  { level:  1, name: '小幼宠',  minExp: 100,   maxExp: 300   },
-  { level:  2, name: '幼宠',    minExp: 300,   maxExp: 600   },
-  { level:  3, name: '活泼期',  minExp: 600,   maxExp: 1000  },
-  { level:  4, name: '成长期',  minExp: 1000,  maxExp: 1500  },
-  { level:  5, name: '少年宠',  minExp: 1500,  maxExp: 2200  },
-  { level:  6, name: '青春期',  minExp: 2200,  maxExp: 3100  },
-  { level:  7, name: '亚成体',  minExp: 3100,  maxExp: 4200  },
-  { level:  8, name: '成长宠',  minExp: 4200,  maxExp: 5600  },
-  { level:  9, name: '壮年宠',  minExp: 5600,  maxExp: 7200  },
-  { level: 10, name: '熟练宠',  minExp: 7200,  maxExp: 9000  },
-  { level: 11, name: '精英宠',  minExp: 9000,  maxExp: 11200 },
-  { level: 12, name: '强化宠',  minExp: 11200, maxExp: 13700 },
-  { level: 13, name: '进化宠',  minExp: 13700, maxExp: 16500 },
-  { level: 14, name: '超进化',  minExp: 16500, maxExp: 20000 },
-  { level: 15, name: '稀有宠',  minExp: 20000, maxExp: 24000 },
-  { level: 16, name: '史诗宠',  minExp: 24000, maxExp: 28500 },
-  { level: 17, name: '传奇宠',  minExp: 28500, maxExp: 33500 },
-  { level: 18, name: '神话宠',  minExp: 33500, maxExp: 39000 },
-  { level: 19, name: '✨传说✨', minExp: 39000, maxExp: 45000 },
-  { level: 20, name: '巅峰宠',  minExp: 45000, maxExp: 99999 },
+  { level:  0, name: '小幼宠',  minExp: 0,     maxExp: 100   },
+  { level:  1, name: '幼宠',    minExp: 100,   maxExp: 300   },
+  { level:  2, name: '活泼期',  minExp: 300,   maxExp: 600   },
+  { level:  3, name: '成长期',  minExp: 600,   maxExp: 1000  },
+  { level:  4, name: '少年宠',  minExp: 1000,  maxExp: 1500  },
+  { level:  5, name: '青春期',  minExp: 1500,  maxExp: 2200  },
+  { level:  6, name: '亚成体',  minExp: 2200,  maxExp: 3100  },
+  { level:  7, name: '成长宠',  minExp: 3100,  maxExp: 4200  },
+  { level:  8, name: '壮年宠',  minExp: 4200,  maxExp: 5600  },
+  { level:  9, name: '熟练宠',  minExp: 5600,  maxExp: 7200  },
+  { level: 10, name: '精英宠',  minExp: 7200,  maxExp: 9000  },
+  { level: 11, name: '强化宠',  minExp: 9000,  maxExp: 11200 },
+  { level: 12, name: '进化宠',  minExp: 11200, maxExp: 13700 },
+  { level: 13, name: '超进化',  minExp: 13700, maxExp: 16500 },
+  { level: 14, name: '稀有宠',  minExp: 16500, maxExp: 20000 },
+  { level: 15, name: '史诗宠',  minExp: 20000, maxExp: 24000 },
+  { level: 16, name: '传奇宠',  minExp: 24000, maxExp: 28500 },
+  { level: 17, name: '神话宠',  minExp: 28500, maxExp: 33500 },
+  { level: 18, name: '✨传说✨', minExp: 33500, maxExp: 39000 },
+  { level: 19, name: '巅峰宠',  minExp: 39000, maxExp: 99999 },
 ];
 
-// 宠物状态表情
+// 宠物状态表情及原因
 const PET_MOODS = {
   happy:   { emoji: '😄', label: '开心' },
   normal:  { emoji: '😊', label: '平静' },
@@ -56,7 +58,68 @@ const PET_MOODS = {
   sick:    { emoji: '🤒', label: '生病' },
   sleepy:  { emoji: '😴', label: '困了' },
   excited: { emoji: '🤩', label: '兴奋' },
+  dead:    { emoji: '💀', label: '已死亡' },
 };
+
+// 心情原因（用于随机显示）
+const MOOD_REASONS = {
+  happy: [
+    '主人陪我玩得很开心！',
+    '吃了美味的食物，心情好好~',
+    '今天天气真不错呢！',
+    '有主人在身边就开心！',
+    '洗完澡真舒服呀~',
+    '被主人夸奖了，好开心！',
+    '睡了个美美的午觉~',
+    '和小伙伴一起玩耍！',
+  ],
+  normal: [
+    '悠闲地晒太阳中...',
+    '静静地待着，很舒服~',
+    '发呆中...想什么呢？',
+    '懒洋洋地躺着~',
+    '看着窗外发呆...',
+    '一切都很平静呢~',
+  ],
+  hungry: [
+    '肚子咕咕叫了...',
+    '好饿呀，想吃东西！',
+    '闻到食物的香味了~',
+    '主人，我饿了...',
+    '想吃好吃的！',
+  ],
+  sad: [
+    '有点想念主人了...',
+    '一个人有点孤单...',
+    '今天有点不开心...',
+    '想出去玩...',
+    '主人好久没陪我玩了',
+  ],
+  sick: [
+    '感觉有点不舒服...',
+    '头有点晕晕的...',
+    '需要好好休息一下',
+    '身体不太舒服...',
+  ],
+  sleepy: [
+    '好困呀...想睡觉了',
+    '眼皮越来越重了...',
+    '打了个大哈欠~',
+    '迷迷糊糊的...',
+  ],
+  excited: [
+    '太开心了！转圈圈~',
+    '哇！有惊喜！',
+    '兴奋得停不下来！',
+    '今天超开心的！',
+  ],
+};
+
+// 获取随机心情原因
+function getMoodReason(moodKey) {
+  const reasons = MOOD_REASONS[moodKey] || MOOD_REASONS.normal;
+  return reasons[Math.floor(Math.random() * reasons.length)];
+}
 
 // 背包道具（金币购买）
 const ITEMS = [
@@ -331,33 +394,83 @@ const ACHIEVEMENT_RARITIES = {
 // 积分兑换商店
 const SHOP_ITEMS = ITEMS.map(item => ({ ...item }));
 
+
+
 // 工具函数
+// 工具函数：判断是否是有效的 emoji 字符（简单判断）
+function isValidEmoji(str) {
+  if (!str || typeof str !== 'string') return false;
+  // 排除纯英文/数字字符串（如 'xuehu', 'jinli'）
+  if (/^[a-zA-Z0-9]+$/.test(str)) return false;
+  // 排除纯中文字符串
+  if (/^[\u4e00-\u9fa5]+$/.test(str)) return false;
+  // emoji 字符一般在1-4个代码点
+  if (str.length > 4) return false;
+  // emoji 包含特殊 Unicode 字符或表情符号
+  // 检查是否包含非 ASCII、非中文、非字母数字的字符
+  for (let i = 0; i < str.length; i++) {
+    const code = str.charCodeAt(i);
+    if (code > 127 && !((code >= 0x4e00 && code <= 0x9fa5))) {
+      return true; // 包含特殊字符，很可能是 emoji
+    }
+  }
+  return false;
+}
+
 function getStudentPetEmoji(student) {
+  // 优先显示自定义 emoji（从 Excel 导入），但必须是有效的 emoji 字符
+  if (student.petEmoji && isValidEmoji(student.petEmoji)) {
+    return student.petEmoji;
+  }
+  // 有自定义图片时，不显示 emoji（图片逻辑在 PetPage 组件中处理）
+  // 注意：petImage 优先级高于 emoji，已在 PetPage 中处理
   const petType = PET_TYPES.find(p => p.id === student.petType);
-  if (!petType) return '🥚';
-  // 死亡状态显示蛋
-  if (student.petDead) return '🥚';
+  if (!petType) return '🐱';
+  // 死亡状态显示伤心的宠物
+  if (student.petDead) return petType.emoji;
   const level = getLevelInfo(student.petExp || 0).level;
-  // 20级 → 6个外观阶段映射（已移除"刚出壳"）
-  // level 0-2 → stages[0](蛋), 3-7 → stages[1], 8-11 → stages[2], 12-15 → stages[3], 16-18 → stages[4], 19-20 → stages[5]
+  // 19级 → 5个外观阶段（已移除蛋阶段）
+  // level 0-1 → stages[0], 2-7 → stages[1], 8-12 → stages[2], 13-16 → stages[3], 17-19 → stages[4]
   let stageIdx;
-  if (level <= 2)       stageIdx = 0;  // 蛋
-  else if (level <= 7)  stageIdx = 1;  // 幼宠
-  else if (level <= 11) stageIdx = 2;  // 成长
-  else if (level <= 15) stageIdx = 3;  // 成熟
-  else if (level <= 18) stageIdx = 4;  // 进化
-  else                  stageIdx = 5;  // 传说
+  if (level <= 1)       stageIdx = 0;  // 幼宠
+  else if (level <= 7)  stageIdx = 1;  // 成长期
+  else if (level <= 12) stageIdx = 2;  // 成熟
+  else if (level <= 16) stageIdx = 3;  // 进化
+  else                  stageIdx = 4;  // 传说
   return petType.stages[Math.min(stageIdx, petType.stages.length - 1)];
 }
 
-function getStudentMood(status) {
+// 统一的宠物显示（用于主页等位置）
+function getStudentPetDisplay(student) {
+  // 有自定义图片时返回图片URL（统一格式）
+  if (student.petImage) {
+    return { type: 'image', value: student.petImage };
+  }
+  // 否则返回 emoji
+  return { type: 'emoji', value: getStudentPetEmoji(student) };
+}
+
+function getStudentMood(status, student) {
+  // 死亡状态直接返回死亡心情
+  if (student && student.petDead) return PET_MOODS.dead;
   if (!status) return PET_MOODS.normal;
   const { health, hungry, happy, clean } = status;
+  
+  // 优先级：先检查负面状态
   if (health < 30) return PET_MOODS.sick;
   if (hungry < 20) return PET_MOODS.hungry;
-  if (happy > 85) return PET_MOODS.excited;
-  if (happy > 70) return PET_MOODS.happy;
+  if (clean < 20) return PET_MOODS.sad;
   if (happy < 40) return PET_MOODS.sad;
+  
+  // 所有状态都好时，才显示正面心情
+  if (health >= 70 && hungry >= 60 && happy >= 70 && clean >= 60) {
+    if (happy > 85) return PET_MOODS.excited;
+    if (happy > 70) return PET_MOODS.happy;
+  }
+  
+  // 状态一般时
+  if (happy < 60) return PET_MOODS.normal;
+  
   return PET_MOODS.normal;
 }
 

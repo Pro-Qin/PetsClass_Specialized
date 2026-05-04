@@ -103,7 +103,9 @@ const AdminTeachers = {
       searchText: '',
       resetModal: false,
       resetTarget: null,
+      currentPassword: '',
       newPassword: '',
+      showCurrentPwd: false,
       confirmDeleteId: null,
       showDeleteModal: false,
       allTeachers: [],
@@ -124,17 +126,25 @@ const AdminTeachers = {
     },
   },
   methods: {
-    openReset(teacher) {
+    async openReset(teacher) {
       this.resetTarget = teacher;
       this.newPassword = '';
+      this.showCurrentPwd = false;
+      // 从 TEACHER_ACCOUNTS 读取当前密码
+      const found = TEACHER_ACCOUNTS.find(t => t.id === teacher.id);
+      this.currentPassword = found ? found.password : '未知';
       this.resetModal = true;
     },
     async doReset() {
-      if (!this.newPassword || this.newPassword.length < 6) {
+      if (this.newPassword && this.newPassword.length < 6) {
         Store.toast('密码至少6位', 'warning'); return;
       }
-      await Store.resetTeacherPassword(this.resetTarget.id, this.newPassword);
-      Store.toast(`✅ 已重置 ${this.resetTarget.name} 的密码`, 'success');
+      if (this.newPassword) {
+        await Store.resetTeacherPassword(this.resetTarget.id, this.newPassword);
+        Store.toast(`✅ ${this.resetTarget.name} 密码已更新`, 'success');
+      } else {
+        Store.toast('未修改密码', 'info');
+      }
       this.resetModal = false;
       this._rev++;
     },
@@ -193,15 +203,34 @@ const AdminTeachers = {
       <!-- 重置密码弹窗 -->
       <div v-if="resetModal && resetTarget" class="modal-overlay" @click.self="resetModal=false">
         <div class="modal-box">
-          <h3 style="font-size:18px;font-weight:800;margin-bottom:6px;">🔑 重置密码</h3>
-          <p style="color:var(--text-light);font-size:13px;margin-bottom:16px;">为 <strong>{{ resetTarget.name }}</strong> 设置新密码</p>
+          <h3 style="font-size:18px;font-weight:800;margin-bottom:6px;">🔑 教师密码管理</h3>
+          <p style="color:var(--text-light);font-size:13px;margin-bottom:14px;">
+            教师：<strong>{{ resetTarget.name }}</strong>
+          </p>
+
+          <!-- 当前密码 -->
           <div class="input-group">
-            <label>新密码（至少6位）</label>
-            <input class="input-field" v-model="newPassword" type="password" placeholder="请输入新密码" />
+            <label>当前密码</label>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <input class="input-field" :type="showCurrentPwd ? 'text' : 'password'"
+                     :value="currentPassword" readonly
+                     style="background:#F5F5F5;cursor:default;flex:1;" />
+              <button class="btn btn-ghost btn-sm" @click="showCurrentPwd=!showCurrentPwd" style="flex-shrink:0;">
+                {{ showCurrentPwd ? '🙈' : '👁️' }}
+              </button>
+            </div>
           </div>
+
+          <!-- 新密码 -->
+          <div class="input-group">
+            <label>设置新密码</label>
+            <input class="input-field" v-model="newPassword" type="password" placeholder="留空则保持当前密码" />
+            <div style="font-size:11px;color:var(--text-light);margin-top:2px;">至少6位，留空则不修改</div>
+          </div>
+
           <div style="display:flex;gap:10px;">
             <button class="btn btn-ghost" style="flex:1" @click="resetModal=false">取消</button>
-            <button class="btn btn-primary" style="flex:2" @click="doReset">✅ 确认重置</button>
+            <button class="btn btn-primary" style="flex:2" @click="doReset">✅ 保存</button>
           </div>
         </div>
       </div>
@@ -447,6 +476,8 @@ const AdminSettings = {
       editError: '',
       // 班级名称
       className: localStorage.getItem('className') || '高一一班',
+      // 导入结果
+      importResult: null,
     };
   },
   computed: {
@@ -459,6 +490,42 @@ const AdminSettings = {
       await Store.nukeAll();
       Store.toast('✅ 全部数据已重置为初始状态', 'success');
       this.confirmNuke = false;
+    },
+    async importPets() {
+      if (typeof PetImport === 'undefined') {
+        this.importResult = { success: false, message: '❌ PetImport 模块未加载，请刷新页面重试' };
+        return;
+      }
+      try {
+        const result = PetImport.run({ overwrite: true, lockPairings: true });
+        // PetImport.run() 已经调用了 dbStorage.storeStudents() 持久化
+        // 直接更新 Store 的 studentRev 触发 UI 刷新，不要重新 load（会覆盖内存修改）
+        Store.state.studentRev++;
+        this.importResult = { 
+          success: true, 
+          message: `✅ 导入完成！共 ${result.total} 人，成功 ${result.imported} 人，跳过 ${result.skipped} 人` 
+        };
+        Store.toast('✅ 宠物导入完成', 'success');
+      } catch (e) {
+        this.importResult = { success: false, message: `❌ 导入失败: ${e.message}` };
+      }
+    },
+    previewImport() {
+      if (typeof PetImport === 'undefined') {
+        this.importResult = { success: false, message: '❌ PetImport 模块未加载' };
+        return;
+      }
+      const stats = PetImport.getStats();
+      const list = PetImport.listStudents();
+      const msg = `📊 导入预览：
+总计 ${stats.total} 人
+有图片: ${stats.withImages} 人
+通用图: ${stats.genericAssigned} 人
+多状态: ${stats.multiState} 人
+
+前5个学生：
+${list.slice(0, 5).map(s => `${s.name}: ${s.pet} ${s.hasImage ? '🖼️' : '📝'}`).join('\n')}`;
+      this.importResult = { success: true, message: msg };
     },
     openEditAdmin() {
       this.editUsername     = this.adminUsername;
@@ -572,6 +639,24 @@ const AdminSettings = {
           </div>
         </div>
 
+        <!-- 宠物导入 -->
+        <div class="card" style="padding:20px;border:2px solid #E8F5E9;background:#FAFAFA;">
+          <h3 style="font-size:16px;font-weight:800;margin-bottom:8px;color:#2E7D32;">🐾 宠物导入</h3>
+          <p style="font-size:13px;color:var(--text-light);margin-bottom:14px;">从 Excel 导入学生宠物数据，包括宠物类型、图片和 emoji。</p>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="btn btn-primary" style="background:linear-gradient(135deg,#2E7D32,#4CAF50);" @click="importPets">
+              📥 执行导入
+            </button>
+            <button class="btn btn-ghost" style="color:#2E7D32;border-color:#2E7D32;" @click="previewImport">
+              👁️ 预览导入
+            </button>
+          </div>
+          <div v-if="importResult" style="margin-top:12px;padding:10px;border-radius:8px;font-size:13px;"
+               :style="importResult.success ? 'background:#E8F5E9;color:#2E7D32;' : 'background:#FFEBEE;color:#C62828;'">
+            {{ importResult.message }}
+          </div>
+        </div>
+
         <!-- 危险操作 -->
         <div class="card" style="padding:20px;border:2px solid #FFCDD2;">
           <h3 style="font-size:16px;font-weight:800;margin-bottom:8px;color:#C62828;">⚠️ 危险操作</h3>
@@ -658,6 +743,11 @@ const AdminCloud = {
       localStats: { students: 0, tasks: 0 },
       confirmOverwrite: false, // 拉取前确认覆盖
       autoSyncEnabled: false,
+      // 头像专项操作
+      avatarPushing: false,
+      avatarPulling: false,
+      cloudAvatarCount: null,   // 云端头像数量（null=未检测）
+      localAvatarCount: 0,      // 本地有头像的学生数
     };
   },
   async mounted() {
@@ -666,12 +756,14 @@ const AdminCloud = {
     // 监听数据变化时刷新本地统计
     this._unwatchStudents = this.$watch(() => Store.state.students.length, () => {
       this.localStats.students = Store.state.students.length;
+      this.localAvatarCount = Store.state.students.filter(s => s.avatar || s.petImage).length;
     });
     this._unwatchTasks = this.$watch(() => Store.state.tasks.length, () => {
       this.localStats.tasks = Store.state.tasks.length;
     });
     this.localStats.students = Store.state.students.length;
     this.localStats.tasks = Store.state.tasks.length;
+    this.localAvatarCount = Store.state.students.filter(s => s.avatar || s.petImage).length;
   },
   beforeUnmount() {
     if (this._unwatchStudents) this._unwatchStudents();
@@ -687,6 +779,29 @@ const AdminCloud = {
     async refreshStats() {
       this.lastSyncTime = await Store.cloudLastSync();
       this.cloudStats = await Store.cloudStats();
+      // 查询云端头像数量
+      try {
+        const avatarStats = await CloudSync.getAvatarStats();
+        this.cloudAvatarCount = avatarStats ? avatarStats.count : 0;
+      } catch (e) {
+        this.cloudAvatarCount = null;
+      }
+    },
+
+    async doPushAvatars() {
+      this.avatarPushing = true;
+      await Store.cloudPushAvatars();
+      this.avatarPushing = false;
+      await this.refreshStats();
+    },
+
+    async doPullAvatars() {
+      this.avatarPulling = true;
+      const result = await Store.cloudPullAvatars();
+      this.avatarPulling = false;
+      if (result.success) {
+        this.localAvatarCount = Store.state.students.filter(s => s.avatar || s.petImage).length;
+      }
     },
 
     async doPush() {
@@ -826,6 +941,67 @@ const AdminCloud = {
               {{ pulling ? '🔄 下载中...' : '📥 下载' }}
             </button>
           </div>
+        </div>
+      </div>
+
+      <!-- 🖼️ 头像专项管理（迁移到新环境时使用）-->
+      <div class="card" style="padding:20px;margin-bottom:16px;border:2px solid #E8F5E9;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+          <span style="font-size:20px;">🖼️</span>
+          <h3 style="font-size:15px;font-weight:800;margin:0;">头像专项管理</h3>
+          <span style="font-size:11px;background:#E8F5E9;color:#2E7D32;padding:2px 8px;border-radius:99px;font-weight:600;">迁移/恢复用</span>
+        </div>
+        <p style="font-size:12px;color:var(--text-mid);margin:0 0 14px;line-height:1.7;">
+          头像以 <strong>base64</strong> 格式存于浏览器本地数据库，拷贝代码到新环境后头像会丢失。<br>
+          使用下方按钮：在旧环境先<strong>备份头像</strong>，再在新环境<strong>恢复头像</strong>。
+        </p>
+
+        <!-- 头像统计 -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+          <div style="background:#F3E5F5;border-radius:10px;padding:12px;text-align:center;">
+            <div style="font-size:11px;color:#7B1FA2;margin-bottom:4px;">本地有头像学生</div>
+            <div style="font-size:24px;font-weight:800;color:#7C4DFF;">{{ localAvatarCount }}</div>
+            <div style="font-size:11px;color:var(--text-light);">/ {{ localStats.students }} 人</div>
+          </div>
+          <div style="background:#E8F5E9;border-radius:10px;padding:12px;text-align:center;">
+            <div style="font-size:11px;color:#2E7D32;margin-bottom:4px;">云端已备份头像</div>
+            <div style="font-size:24px;font-weight:800;color:#2E7D32;">
+              {{ cloudAvatarCount === null ? '—' : cloudAvatarCount }}
+            </div>
+            <div style="font-size:11px;color:var(--text-light);">个学生</div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <!-- 备份头像 -->
+          <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:#F8F4FF;border-radius:10px;">
+            <div style="flex:1;">
+              <div style="font-size:13px;font-weight:700;">☁️ 备份头像到云端</div>
+              <div style="font-size:11px;color:var(--text-light);margin-top:2px;">在<strong>旧/源环境</strong>执行，将本地头像上传到云端</div>
+            </div>
+            <button class="btn btn-primary" style="min-width:100px;flex-shrink:0;font-size:13px;"
+                    :disabled="avatarPushing || localAvatarCount === 0 || !connectionStatus?.ok"
+                    @click="doPushAvatars">
+              {{ avatarPushing ? '上传中...' : '📤 备份头像' }}
+            </button>
+          </div>
+
+          <!-- 恢复头像 -->
+          <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:#F0FFF4;border-radius:10px;">
+            <div style="flex:1;">
+              <div style="font-size:13px;font-weight:700;">🔄 从云端恢复头像</div>
+              <div style="font-size:11px;color:var(--text-light);margin-top:2px;">在<strong>新/目标环境</strong>执行，将云端头像恢复到本地</div>
+            </div>
+            <button class="btn" style="min-width:100px;flex-shrink:0;background:#2E7D32;color:white;border:none;font-size:13px;"
+                    :disabled="avatarPulling || !connectionStatus?.ok || cloudAvatarCount === 0"
+                    @click="doPullAvatars">
+              {{ avatarPulling ? '恢复中...' : '📥 恢复头像' }}
+            </button>
+          </div>
+        </div>
+
+        <div v-if="localAvatarCount === 0 && cloudAvatarCount === 0" style="margin-top:12px;padding:10px 14px;background:#FFF9E6;border-radius:10px;font-size:12px;color:#B8860B;">
+          ⚠️ 当前本地和云端都没有头像数据。如需找回，请使用 JSON 备份文件恢复（管理员设置 → 数据管理）。
         </div>
       </div>
 

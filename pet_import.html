@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>宠物图片批量导入</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+    .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    h1 { color: #333; }
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin: 20px 0; }
+    .stat { background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; }
+    .stat-value { font-size: 2em; font-weight: bold; color: #4CAF50; }
+    .stat-label { color: #666; font-size: 0.9em; }
+    .btn { padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; margin: 5px; }
+    .btn-primary { background: #4CAF50; color: white; }
+    .btn-primary:hover { background: #45a049; }
+    .btn-secondary { background: #2196F3; color: white; }
+    .btn-secondary:hover { background: #1976D2; }
+    .student-list { max-height: 400px; overflow-y: auto; margin-top: 20px; }
+    .student-item { padding: 10px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+    .student-item:hover { background: #f8f9fa; }
+    .student-name { font-weight: bold; }
+    .student-pet { color: #666; }
+    .badge { padding: 3px 8px; border-radius: 12px; font-size: 12px; }
+    .badge-generic { background: #FFC107; color: #333; }
+    .badge-multi { background: #9C27B0; color: white; }
+    .badge-noimage { background: #F44336; color: white; }
+    .log { background: #263238; color: #aed581; padding: 15px; border-radius: 5px; margin-top: 20px; font-family: monospace; max-height: 200px; overflow-y: auto; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🐾 宠物图片批量导入</h1>
+
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-value" id="total">-</div>
+        <div class="stat-label">总学生数</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="withImages">-</div>
+        <div class="stat-label">有图片</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="generic">-</div>
+        <div class="stat-label">大众宠物</div>
+      </div>
+    </div>
+
+    <div>
+      <button class="btn btn-primary" onclick="runImport()">▶ 执行导入</button>
+      <button class="btn btn-secondary" onclick="showList()">📋 查看列表</button>
+    </div>
+
+    <div class="student-list" id="studentList"></div>
+
+    <div class="log" id="log"></div>
+  </div>
+
+  <script src="js/data.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/pet_import.js"></script>
+  <script>
+    const $ = id => document.getElementById(id);
+
+    function log(msg) {
+      const logEl = $('log');
+      logEl.innerHTML += new Date().toLocaleTimeString() + ' ' + msg + '<br>';
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    async function init() {
+      await Store.init();
+      while (!Store.state._initialized) await new Promise(r => setTimeout(r, 50));
+
+      const stats = PetImport.getStats();
+      $('total').textContent = stats.total;
+      $('withImages').textContent = stats.withImages;
+      $('generic').textContent = stats.genericAssigned;
+
+      log('数据已加载，共 ' + stats.total + ' 个学生待导入');
+    }
+
+    function runImport() {
+      log('开始导入...');
+      const result = PetImport.run({ overwrite: false, lockPairings: true });
+      log('导入完成: 成功 ' + result.imported + ', 跳过 ' + result.skipped);
+    }
+
+    function showList() {
+      const list = PetImport.listStudents();
+      const html = list.map(s => "<div class='student-item'><div><span class='student-name'>" + s.name + "</span><span class='student-pet'> → " + s.pet + "</span></div><div>" + (s.generic ? "<span class='badge badge-generic'>大众</span>" : "") + (s.hasImage ? "" : "<span class='badge badge-noimage'>无图</span>") + "</div></div>").join("");
+      $('studentList').innerHTML = html;
+    }
+
+    init();
+  </script>
+</body>
+</html>

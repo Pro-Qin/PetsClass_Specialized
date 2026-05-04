@@ -24,6 +24,11 @@ const PetPage = {
       showEditPetModal: false,  // 宠物信息编辑弹窗
       editPetName: '',
       editPetType: null,
+      // 头像上传相关
+      showAvatarUpload: false,  // 显示头像上传弹窗
+      avatarPreview: null,       // 头像预览 URL
+      avatarCanvas: null,        // Canvas 裁剪后的 base64
+      avatarLoading: false,      // 上传中
     };
   },
   computed: {
@@ -31,42 +36,27 @@ const PetPage = {
       return PET_TYPES.find(p => p.id === this.student.petType) || null;
     },
     petEmoji() {
-      if (!this.petType) return '🥚';
-      if (this.student.petDead) return '🥚';
+      if (!this.petType) return '🐱';
+      if (this.student.petDead) return this.petType.emoji;
       return getStudentPetEmoji(this.student);
     },
     petTypes() {
       return PET_TYPES;
     },
     mood() {
-      return getStudentMood(this.student.petStatus);
+      return getStudentMood(this.student.petStatus, this.student);
+    },
+    // 心情原因
+    moodReason() {
+      if (this.student.petDead) return '需要复活才能恢复活力...';
+      const moodKey = this.mood ? Object.keys(PET_MOODS).find(k => PET_MOODS[k] === this.mood) : 'normal';
+      return getMoodReason(moodKey);
     },
     levelInfo() {
       return getLevelInfo(this.student.petExp || 0);
     },
     expPercent() {
       return getExpPercent(this.student.petExp || 0);
-    },
-    // 蛋倒计时信息
-    eggCountdown() {
-      if (!this.student.petDead) return null;
-      const deadAt = this.student.petDeadAt;
-      if (!deadAt) {
-        return { daysSince: null, daysLeft: null, urgent: false, hint: '用食物喂食，累计3次即可重新孵化' };
-      }
-      const deadDate = new Date(deadAt);
-      const now = new Date();
-      const daysSince = Math.floor((now - deadDate) / (1000 * 60 * 60 * 24));
-      // 超过7天饿死（逻辑由后端处理，这里只展示时间）
-      const daysLeft = Math.max(0, 7 - daysSince);
-      return {
-        daysSince,
-        daysLeft,
-        urgent: daysLeft <= 2,
-        hint: daysLeft > 0
-          ? `距饿死还有 ${daysLeft} 天，尽快喂食！`
-          : '宠物即将饿死，请立即喂食！',
-      };
     },
     dailyExpLimit() {
       return typeof DAILY_EXP_LIMIT !== 'undefined' ? DAILY_EXP_LIMIT : 50;
@@ -149,6 +139,106 @@ const PetPage = {
     },
   },
   methods: {
+    // ========== 头像上传 ==========
+    openAvatarUpload() {
+      this.showAvatarUpload = true;
+      this.avatarPreview = null;
+      this.avatarCanvas = null;
+    },
+    closeAvatarUpload() {
+      this.showAvatarUpload = false;
+      this.avatarPreview = null;
+      this.avatarCanvas = null;
+    },
+    onAvatarFileSelect(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      if (!file.type.startsWith('image/')) {
+        this.$emit('toast', '请选择图片文件', 'error');
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        this.$emit('toast', '图片大小不能超过 5MB', 'error');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        this.avatarPreview = e.target.result;
+        this.$nextTick(() => this.cropAvatar());
+      };
+      reader.readAsDataURL(file);
+    },
+    cropAvatar() {
+      // 圆形裁剪头像
+      const img = this.$refs.avatarImg;
+      if (!img) return;
+      const size = 200; // 输出尺寸
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+
+      // 创建圆形裁剪路径
+      ctx.beginPath();
+      ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.clip();
+
+      // 计算缩放以填满圆形
+      const srcSize = Math.min(img.naturalWidth, img.naturalHeight);
+      const dx = (img.naturalWidth - srcSize) / 2;
+      const dy = (img.naturalHeight - srcSize) / 2;
+      ctx.drawImage(img, dx, dy, srcSize, srcSize, 0, 0, size, size);
+
+      this.avatarCanvas = canvas.toDataURL('image/png', 0.9);
+    },
+    async saveAvatar() {
+      if (!this.avatarCanvas) {
+        this.$emit('toast', '请先选择图片', 'warning');
+        return;
+      }
+      // 确保有有效的学生ID
+      const sid = this.student && (this.student.id || this.student._id);
+      if (!sid) {
+        console.error('[saveAvatar] 学生ID无效:', this.student);
+        this.$emit('toast', '无法保存：学生信息缺失', 'error');
+        return;
+      }
+      this.avatarLoading = true;
+      try {
+        const ok = await Store.updateAvatar(sid, this.avatarCanvas);
+        if (ok) {
+          this.$emit('toast', '头像已更新！', 'success');
+          this.$emit('update');  // 通知父组件刷新数据
+          this.closeAvatarUpload();
+        } else {
+          this.$emit('toast', '保存失败：未找到学生', 'error');
+        }
+      } catch (e) {
+        console.error('[saveAvatar] 保存失败:', e);
+        this.$emit('toast', '保存失败', 'error');
+      }
+      this.avatarLoading = false;
+    },
+    async removeAvatar() {
+      if (!this.student || !this.student.avatar) return;
+      const sid = this.student.id || this.student._id;
+      if (!sid) {
+        this.$emit('toast', '无法移除：学生信息缺失', 'error');
+        return;
+      }
+      this.avatarLoading = true;
+      try {
+        await Store.updateAvatar(sid, null);
+        this.$emit('toast', '头像已移除', 'success');
+        this.$emit('update');
+        this.closeAvatarUpload();
+      } catch (e) {
+        this.$emit('toast', '移除失败', 'error');
+      }
+      this.avatarLoading = false;
+    },
+
     triggerAction(actionType) {
       if (this.actionLoading) return;
       this.currentActionType = actionType;
@@ -190,17 +280,10 @@ const PetPage = {
       this.actionLoading = false;
 
       if (result.success) {
-        // 孵化完成！
-        if (result.hatched) {
+        // 宠物复活（从死亡状态）
+        if (result.recovered) {
           this.refreshStudent(result.student);
-          this.$emit('toast', `🎉 宠物孵化成功！${result.student?.petName || this.student.petName} 重新回来啦！`, 'success');
-          return;
-        }
-        // 孵化进度推进（传入 result.student 避免 IndexedDB 重读时序问题）
-        if (result.hatchProgress !== undefined) {
-          this.refreshStudent(result.student);
-          const remain = 3 - result.hatchProgress;
-          this.$emit('toast', `🥚 喂食了！还需再喂 ${remain} 次才能孵化`, 'info');
+          this.$emit('toast', `🎉 ${result.student?.petName || this.student.petName} 复活啦！经验已重置，重新开始成长吧~`, 'success');
           return;
         }
         const effectTexts = [];
@@ -317,15 +400,39 @@ const PetPage = {
             <div class="pet-bg"></div>
             <!-- 气泡 -->
             <div v-if="showBubble" class="pet-status-bubble" style="max-width:180px;font-size:11px;">{{ bubbleText }}</div>
-            <!-- 宠物 -->
-            <div class="pet-emoji" :class="petAction" :style="{fontSize: '90px'}">{{ petEmoji }}</div>
+            <!-- 宠物：优先显示自定义头像 > 宠物图片 > emoji -->
+            <div class="pet-emoji" :class="petAction" :style="{fontSize: '90px'}">
+              <img v-if="student.avatar && student.avatar.startsWith('data:')"
+                   :src="student.avatar"
+                   style="width:90px;height:90px;border-radius:50%;object-fit:cover;border:3px solid white;box-shadow:0 4px 12px rgba(0,0,0,0.2);cursor:pointer;"
+                   @click.stop="showAvatarUpload=true"
+                   title="点击更换头像" />
+              <img v-else-if="student.petImage"
+                   :src="student.petImage"
+                   style="width:90px;height:90px;border-radius:50%;object-fit:cover;border:3px solid white;box-shadow:0 4px 12px rgba(0,0,0,0.2);cursor:pointer;"
+                   @click.stop="showAvatarUpload=true"
+                   title="点击更换头像" />
+              <span v-else @click.stop="showAvatarUpload=true" title="点击上传头像">{{ petEmoji }}</span>
+            </div>
             <!-- 等级徽章 -->
             <div class="pet-level-badge">Lv.{{ levelInfo.level }} {{ levelInfo.name }}</div>
+            <!-- 头像上传按钮 -->
+            <button class="avatar-upload-btn" @click.stop="showAvatarUpload=true" title="上传自定义头像">
+              📷
+            </button>
           </div>
 
-          <div class="pet-name">{{ student.petName || '我的宠物' }} {{ student.petDead ? '💔' : mood.emoji }}</div>
+          <div class="pet-name">{{ student.petName || '我的宠物' }} {{ student.petDead ? '💀' : mood.emoji }}</div>
+          <!-- 宠物归属 -->
+          <div style="color:var(--text-light);font-size:12px;margin-bottom:4px;">
+            🏠 属于 {{ student.name }}
+          </div>
           <div style="color:var(--text-light);font-size:13px;margin-bottom:8px;">
-            {{ student.petDead ? '宠物变成了一颗蛋，用食物喂它重新孵化吧！' : mood.label }}
+            <template v-if="student.petDead">
+              <span style="color:#F44336;">宠物已死亡...</span><br>
+              <span>喂食可以复活宠物（经验将清零）</span>
+            </template>
+            <template v-else>{{ mood.label }} - {{ moodReason }}</template>
           </div>
 
           <!-- 积分 + 金币入口（并排显示） -->
@@ -348,44 +455,6 @@ const PetPage = {
               <span style="font-size:16px;font-weight:900;color:#B8860B;">{{ student.money || 0 }}</span>
               <span style="font-size:11px;color:#FFA000;font-weight:600;">金币</span>
             </div>
-          </div>
-
-          <!-- 蛋态：孵化进度 + 倒计时 -->
-          <div v-if="student.petDead"
-               style="width:100%;max-width:280px;margin-bottom:16px;background:#FFF3E0;border-radius:16px;padding:14px;text-align:center;">
-            <!-- 死亡时间倒计时（超过7天饿死） -->
-            <div v-if="eggCountdown && eggCountdown.daysSince !== null" style="margin-bottom:10px;">
-              <div style="font-size:11px;color:#FF9800;margin-bottom:4px;">
-                ⏰ 宠物已变成蛋 {{ eggCountdown.daysSince }} 天
-              </div>
-              <div :style="{
-                fontSize:'12px',
-                fontWeight:'700',
-                color: eggCountdown.urgent ? '#D32F2F' : '#E65100',
-                padding:'4px 10px',
-                borderRadius:'8px',
-                display:'inline-block',
-                background: eggCountdown.urgent ? '#FFCDD2' : '#FFE0B2'
-              }">{{ eggCountdown.hint }}</div>
-            </div>
-            <div style="font-size:13px;font-weight:700;color:#E65100;margin-bottom:8px;">🥚 孵化进度</div>
-            <div style="display:flex;justify-content:center;gap:10px;margin-bottom:8px;">
-              <span v-for="i in 3" :key="i"
-                    style="font-size:24px;transition:all 0.3s;"
-                    :style="{opacity: i <= (student.petHatchProgress||0) ? 1 : 0.25, transform: i <= (student.petHatchProgress||0) ? 'scale(1.2)' : 'scale(1)'}">🥚</span>
-            </div>
-            <div style="font-size:12px;color:#FF9800;margin-bottom:4px;">
-              已喂食 {{ student.petHatchProgress || 0 }} / 3 次
-            </div>
-            <!-- 孵化进度条 -->
-            <div class="progress-bar" style="margin-bottom:6px;">
-              <div class="progress-fill" style="background:linear-gradient(90deg,#FF9800,#FFD54F);"
-                   :style="{width: Math.round(((student.petHatchProgress||0)/3)*100) + '%'}"></div>
-            </div>
-            <div v-if="(student.petHatchProgress||0) >= 3" style="font-size:13px;font-weight:800;color:#4CAF50;margin-top:6px;">
-              ✨ 孵化条件已满足，继续喂食即可激活宠物！
-            </div>
-            <div v-else style="font-size:11px;color:var(--text-light);margin-top:4px;">🍎 用食物道具喂食即可推进孵化</div>
           </div>
 
           <!-- 去商店（竖屏时在底部，横屏时在左侧底部） -->
@@ -472,7 +541,7 @@ const PetPage = {
             <button class="action-btn action-feed" @click="triggerAction('feed')" :disabled="actionLoading">
               <span class="action-icon">🍎</span>
               <span>喂食</span>
-              <span class="action-cost">{{ student.petDead ? '孵化' : '道具' }}</span>
+              <span class="action-cost">道具</span>
             </button>
             <template v-if="!student.petDead">
             <button class="action-btn action-bath" @click="triggerAction('bath')" :disabled="actionLoading">
@@ -624,15 +693,15 @@ const PetPage = {
         <div class="modal-box" style="max-width:400px;">
           <!-- 步骤1：选宠物 -->
           <div v-if="createPetStep===1">
-            <div style="font-size:56px;margin-bottom:12px;">🥚</div>
-            <h2 style="font-size:22px;font-weight:900;color:var(--text-dark);margin-bottom:6px;">领取你的宠物蛋</h2>
+            <div style="font-size:56px;margin-bottom:12px;">🐾</div>
+            <h2 style="font-size:22px;font-weight:900;color:var(--text-dark);margin-bottom:6px;">领取你的宠物</h2>
             <p style="color:var(--text-light);font-size:14px;margin-bottom:24px;">选择你最喜欢的宠物吧！完成学习任务帮助它成长～</p>
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px;">
               <div v-for="pet in petTypes" :key="pet.id"
                    class="card" style="padding:16px;cursor:pointer;transition:all 0.3s;"
                    :style="selectedPetType===pet.id ? 'border-color:var(--primary);background:#FFF0F8;transform:scale(1.05)' : ''"
                    @click="selectPet(pet.id)">
-                <div style="font-size:40px;margin-bottom:6px;">{{ pet.stages[2] }}</div>
+                <div style="font-size:40px;margin-bottom:6px;">{{ pet.stages[1] }}</div>
                 <div style="font-size:13px;font-weight:700;color:var(--text-dark);">{{ pet.name }}</div>
                 <div v-if="selectedPetType===pet.id" style="color:var(--primary);font-size:16px;margin-top:4px;">✓</div>
               </div>
@@ -645,7 +714,7 @@ const PetPage = {
           <!-- 步骤2：命名 -->
           <div v-if="createPetStep===2">
             <div style="font-size:72px;margin-bottom:12px;animation:petFloat 3s ease-in-out infinite;">
-              {{ petTypes.find(p => p.id === selectedPetType) && petTypes.find(p => p.id === selectedPetType).stages[2] }}
+              {{ petTypes.find(p => p.id === selectedPetType) && petTypes.find(p => p.id === selectedPetType).stages[1] }}
             </div>
             <h2 style="font-size:22px;font-weight:900;color:var(--text-dark);margin-bottom:6px;">给你的宠物起个名字</h2>
             <p style="color:var(--text-light);font-size:14px;margin-bottom:20px;">一个好名字会让它更有活力！</p>
@@ -655,27 +724,29 @@ const PetPage = {
             </div>
             <div style="display:flex;gap:10px;justify-content:center;">
               <button class="btn btn-ghost" @click="createPetStep=1">← 重新选择</button>
-              <button class="btn btn-primary btn-lg" @click="startHatch">🥚 开始孵化！</button>
+              <button class="btn btn-primary btn-lg" @click="startHatch">🌟 开始冒险！</button>
             </div>
           </div>
 
-          <!-- 步骤3：孵化动画 -->
+          <!-- 步骤3：领取动画 -->
           <div v-if="createPetStep===3">
             <div style="padding:40px 0">
-              <div style="font-size:120px;animation:hatch 2.5s ease-in-out infinite;display:block;margin:0 auto;">🥚</div>
-              <div style="font-size:18px;font-weight:700;color:var(--primary);margin-top:20px;" class="animate-blink">✨ 正在孵化中... ✨</div>
-              <p style="color:var(--text-light);font-size:14px;margin-top:8px;">宠物即将破壳而出！</p>
+              <div style="font-size:100px;animation:petFloat 2s ease-in-out infinite;display:block;margin:0 auto;">
+                {{ petTypes.find(p => p.id === selectedPetType) && petTypes.find(p => p.id === selectedPetType).stages[0] }}
+              </div>
+              <div style="font-size:18px;font-weight:700;color:var(--primary);margin-top:20px;" class="animate-blink">✨ 正在加入中... ✨</div>
+              <p style="color:var(--text-light);font-size:14px;margin-top:8px;">你的新伙伴即将到来！</p>
             </div>
           </div>
 
-          <!-- 步骤4：孵化完成 -->
+          <!-- 步骤4：领取完成 -->
           <div v-if="createPetStep===4">
             <div style="font-size:100px;margin-bottom:12px;animation:levelUp 1s ease;">
-              {{ petTypes.find(p => p.id === selectedPetType) && petTypes.find(p => p.id === selectedPetType).stages[1] }}
+              {{ petTypes.find(p => p.id === selectedPetType) && petTypes.find(p => p.id === selectedPetType).stages[0] }}
             </div>
             <div style="background:linear-gradient(135deg,#FF6B9D,#7C4DFF);color:white;border-radius:20px;padding:20px;margin-bottom:20px;">
-              <div style="font-size:24px;font-weight:900;margin-bottom:6px;">🎉 孵化成功！</div>
-              <div style="font-size:16px;opacity:0.9;">「{{ petName || (petTypes.find(p => p.id === selectedPetType) && petTypes.find(p => p.id === selectedPetType).name) }}」已经破壳而出</div>
+              <div style="font-size:24px;font-weight:900;margin-bottom:6px;">🎉 领取成功！</div>
+              <div style="font-size:16px;opacity:0.9;">「{{ petName || (petTypes.find(p => p.id === selectedPetType) && petTypes.find(p => p.id === selectedPetType).name) }}」正式加入</div>
               <div style="font-size:13px;opacity:0.75;margin-top:6px;">完成学习任务，帮助它快速成长吧！</div>
             </div>
             <button class="btn btn-primary btn-lg" style="width:100%;max-width:300px;margin:0 auto;display:block;" @click="finishHatch">
@@ -720,6 +791,55 @@ const PetPage = {
           </div>
         </div>
       </div>
+
+      <!-- 头像上传弹窗 -->
+      <div v-if="showAvatarUpload" class="modal-overlay" @click.self="closeAvatarUpload">
+        <div class="modal-box" style="max-width:360px;text-align:center;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+            <h3 style="font-size:18px;font-weight:900;color:var(--text-dark);">📷 自定义头像</h3>
+            <div @click="closeAvatarUpload" style="cursor:pointer;font-size:18px;color:var(--text-light);">✕</div>
+          </div>
+
+          <!-- 预览区域 -->
+          <div style="width:120px;height:120px;border-radius:50%;margin:0 auto 20px;overflow:hidden;border:3px solid var(--primary);background:#f0f0f0;display:flex;align-items:center;justify-content:center;">
+            <img v-if="avatarCanvas" :src="avatarCanvas" style="width:100%;height:100%;object-fit:cover;" />
+            <img v-else-if="student.avatar && student.avatar.startsWith('data:')" :src="student.avatar" style="width:100%;height:100%;object-fit:cover;" />
+            <img v-else-if="student.petImage" :src="student.petImage" style="width:100%;height:100%;object-fit:cover;" />
+            <span v-else style="font-size:48px;">{{ petEmoji }}</span>
+          </div>
+
+          <!-- 选择图片 -->
+          <div style="margin-bottom:16px;">
+            <label class="btn btn-primary" style="cursor:pointer;display:inline-block;padding:10px 24px;">
+              📁 选择图片
+              <input type="file" accept="image/*" @change="onAvatarFileSelect" style="display:none;" />
+            </label>
+          </div>
+
+          <!-- 隐藏的图片用于裁剪 -->
+          <img v-if="avatarPreview" ref="avatarImg" :src="avatarPreview" @load="cropAvatar" style="display:none;max-width:300px;max-height:300px;" />
+
+          <!-- 裁剪预览 -->
+          <div v-if="avatarCanvas" style="margin:16px 0;font-size:13px;color:var(--text-light);">
+            ✓ 头像已裁剪为圆形
+          </div>
+
+          <!-- 操作按钮 -->
+          <div style="display:flex;gap:10px;margin-top:20px;">
+            <button v-if="student.avatar" class="btn btn-ghost" style="flex:1;" @click="removeAvatar" :disabled="avatarLoading">
+              🗑️ 移除
+            </button>
+            <button class="btn btn-primary" style="flex:2;" @click="saveAvatar" :disabled="!avatarCanvas || avatarLoading">
+              {{ avatarLoading ? '保存中...' : '💾 保存头像' }}
+            </button>
+          </div>
+
+          <div style="margin-top:12px;font-size:12px;color:var(--text-light);">
+            支持 JPG、PNG、WebP，最大 5MB<br/>
+            图片会自动裁剪为圆形
+          </div>
+        </div>
+      </div>
     </div>
   `
 };
@@ -736,12 +856,17 @@ const RankPage = {
           ...s,
           rank: i + 1,
           petEmoji: getStudentPetEmoji(s),
+          petImage: s.petImage || null,
+          studentAvatar: s.avatar || null,  // 保留原头像
           levelInfo: getLevelInfo(s.petExp || 0),
         }));
     },
     myRank() {
       return this.rankList.findIndex(s => s.id === this.student.id) + 1;
     }
+  },
+  methods: {
+    getStudentPetEmoji
   },
   template: `
     <div class="animate-pageIn">
@@ -750,7 +875,11 @@ const RankPage = {
       <!-- 我的排名 -->
       <div class="card" style="padding:16px;margin-bottom:20px;background:linear-gradient(135deg,#FF6B9D,#7C4DFF);color:white;border:none;">
         <div style="display:flex;align-items:center;gap:14px;">
-          <div style="font-size:40px;">{{ getStudentPetEmoji(student) }}</div>
+          <div style="width:50px;height:50px;border-radius:50%;overflow:hidden;border:2px solid white;">
+            <img v-if="student.avatar && student.avatar.startsWith('data:')" :src="student.avatar" style="width:100%;height:100%;object-fit:cover;" />
+            <img v-else-if="student.petImage" :src="student.petImage" style="width:100%;height:100%;object-fit:cover;" />
+            <div v-else style="font-size:32px;text-align:center;line-height:46px;">{{ getStudentPetEmoji(student) }}</div>
+          </div>
           <div style="flex:1">
             <div style="font-size:18px;font-weight:800;">{{ student.name }} 的排名</div>
             <div style="font-size:14px;opacity:0.85;">⭐ {{ student.points }} 积分</div>
@@ -765,7 +894,11 @@ const RankPage = {
       <!-- 前三名特殊展示 -->
       <div style="display:flex;gap:10px;margin-bottom:20px;align-items:flex-end;">
         <div v-if="rankList[1]" class="rank-podium rank-2nd" style="flex:1;order:1">
-          <div style="font-size:40px;text-align:center">{{ rankList[1].petEmoji }}</div>
+          <div style="width:60px;height:60px;border-radius:50%;overflow:hidden;margin:0 auto;border:3px solid white;box-shadow:0 4px 12px rgba(0,0,0,0.15);">
+            <img v-if="rankList[1].studentAvatar && rankList[1].studentAvatar.startsWith('data:')" :src="rankList[1].studentAvatar" style="width:100%;height:100%;object-fit:cover;" />
+            <img v-else-if="rankList[1].petImage" :src="rankList[1].petImage" style="width:100%;height:100%;object-fit:cover;" />
+            <div v-else style="font-size:36px;text-align:center;line-height:54px;">{{ rankList[1].petEmoji }}</div>
+          </div>
           <div style="text-align:center;font-weight:800;font-size:13px;">{{ rankList[1].name }}</div>
           <div style="background:linear-gradient(135deg,#B0BEC5,#78909C);color:white;padding:10px;border-radius:10px 10px 0 0;text-align:center;">
             <div style="font-size:20px;font-weight:900;">🥈 #2</div>
@@ -773,7 +906,11 @@ const RankPage = {
           </div>
         </div>
         <div v-if="rankList[0]" class="rank-podium rank-1st" style="flex:1;order:2">
-          <div style="font-size:50px;text-align:center">{{ rankList[0].petEmoji }}</div>
+          <div style="width:80px;height:80px;border-radius:50%;overflow:hidden;margin:0 auto;border:3px solid white;box-shadow:0 4px 12px rgba(0,0,0,0.2);">
+            <img v-if="rankList[0].studentAvatar && rankList[0].studentAvatar.startsWith('data:')" :src="rankList[0].studentAvatar" style="width:100%;height:100%;object-fit:cover;" />
+            <img v-else-if="rankList[0].petImage" :src="rankList[0].petImage" style="width:100%;height:100%;object-fit:cover;" />
+            <div v-else style="font-size:48px;text-align:center;line-height:74px;">{{ rankList[0].petEmoji }}</div>
+          </div>
           <div style="text-align:center;font-weight:800;font-size:14px;">{{ rankList[0].name }}</div>
           <div style="background:linear-gradient(135deg,#FFD700,#FFA000);color:white;padding:14px;border-radius:10px 10px 0 0;text-align:center;">
             <div style="font-size:24px;font-weight:900;">👑 #1</div>
@@ -781,7 +918,11 @@ const RankPage = {
           </div>
         </div>
         <div v-if="rankList[2]" class="rank-podium rank-3rd" style="flex:1;order:3">
-          <div style="font-size:36px;text-align:center">{{ rankList[2].petEmoji }}</div>
+          <div style="width:50px;height:50px;border-radius:50%;overflow:hidden;margin:0 auto;border:3px solid white;box-shadow:0 4px 12px rgba(0,0,0,0.15);">
+            <img v-if="rankList[2].studentAvatar && rankList[2].studentAvatar.startsWith('data:')" :src="rankList[2].studentAvatar" style="width:100%;height:100%;object-fit:cover;" />
+            <img v-else-if="rankList[2].petImage" :src="rankList[2].petImage" style="width:100%;height:100%;object-fit:cover;" />
+            <div v-else style="font-size:28px;text-align:center;line-height:44px;">{{ rankList[2].petEmoji }}</div>
+          </div>
           <div style="text-align:center;font-weight:800;font-size:12px;">{{ rankList[2].name }}</div>
           <div style="background:linear-gradient(135deg,#FFAB76,#E64A19);color:white;padding:8px;border-radius:10px 10px 0 0;text-align:center;">
             <div style="font-size:18px;font-weight:900;">🥉 #3</div>
@@ -796,7 +937,15 @@ const RankPage = {
         <div class="rank-num" :class="s.rank<=3 ? 'rank-'+s.rank : 'rank-other'">
           {{ s.rank <= 3 ? ['👑','🥈','🥉'][s.rank-1] : s.rank }}
         </div>
-        <div class="rank-pet">{{ s.petEmoji }}</div>
+        <div class="rank-pet">
+          <div v-if="s.studentAvatar && s.studentAvatar.startsWith('data:')" style="width:36px;height:36px;border-radius:50%;overflow:hidden;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.15);">
+            <img :src="s.studentAvatar" style="width:100%;height:100%;object-fit:cover;" />
+          </div>
+          <div v-else-if="s.petImage" style="width:36px;height:36px;border-radius:50%;overflow:hidden;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.15);">
+            <img :src="s.petImage" style="width:100%;height:100%;object-fit:cover;" />
+          </div>
+          <span v-else>{{ s.petEmoji }}</span>
+        </div>
         <div class="rank-info">
           <div class="rank-name">
             {{ s.name }}
@@ -1078,17 +1227,17 @@ const AchievementPage = {
   `
 };
 
-// ---------- 孵化页面（新用户） ----------
+// ---------- 领取页面（新用户） ----------
 const HatchPage = {
   name: 'HatchPage',
   props: ['student'],
   emits: ['update', 'toast', 'hatch-done'],
   data() {
     return {
-      step: 1,          // 1:选宠物 2:命名 3:孵化动画 4:完成
+      step: 1,          // 1:选宠物 2:命名 3:领取动画 4:完成
       selectedType: null,
       petName: '',
-      hatching: false,
+      loading: false,
     };
   },
   computed: {
@@ -1105,10 +1254,10 @@ const HatchPage = {
       if (!this.selectedType) { this.$emit('toast','请先选择一个宠物！','warning'); return; }
       const name = this.petName.trim() || this.selectedPetType.name;
       this.step = 3;
-      this.hatching = true;
+      this.loading = true;
       await new Promise(r => setTimeout(r, 2500));
       const result = await Store.adoptPet(this.student.id, this.selectedType, name);
-      this.hatching = false;
+      this.loading = false;
       if (!result.success) {
         this.$emit('toast', result.msg || '领养失败，请重试', 'error');
         this.step = 1;
@@ -1117,7 +1266,6 @@ const HatchPage = {
       this.step = 4;
     },
     finish() {
-      // 先刷新数据，再通知父组件孵化完成跳转
       this.$emit('update');
       this.$emit('hatch-done');
     }
@@ -1126,15 +1274,15 @@ const HatchPage = {
     <div class="animate-pageIn" style="padding:20px;text-align:center;">
       <!-- 步骤1：选宠物 -->
       <div v-if="step===1">
-        <div style="font-size:56px;margin-bottom:12px;">🥚</div>
-        <h2 style="font-size:22px;font-weight:900;color:var(--text-dark);margin-bottom:6px;">领取你的宠物蛋</h2>
+        <div style="font-size:56px;margin-bottom:12px;">🐾</div>
+        <h2 style="font-size:22px;font-weight:900;color:var(--text-dark);margin-bottom:6px;">领取你的宠物</h2>
         <p style="color:var(--text-light);font-size:14px;margin-bottom:24px;">选择你最喜欢的宠物吧！完成学习任务帮助它成长～</p>
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px;">
           <div v-for="pet in petTypes" :key="pet.id"
                class="card" style="padding:16px;cursor:pointer;transition:all 0.3s;"
                :style="selectedType===pet.id ? 'border-color:var(--primary);background:#FFF0F8;transform:scale(1.05)' : ''"
                @click="selectPet(pet.id)">
-            <div style="font-size:40px;margin-bottom:6px;">{{ pet.stages[2] }}</div>
+            <div style="font-size:40px;margin-bottom:6px;">{{ pet.stages[1] }}</div>
             <div style="font-size:13px;font-weight:700;color:var(--text-dark);">{{ pet.name }}</div>
             <div v-if="selectedType===pet.id" style="color:var(--primary);font-size:16px;margin-top:4px;">✓</div>
           </div>
@@ -1147,7 +1295,7 @@ const HatchPage = {
       <!-- 步骤2：命名 -->
       <div v-if="step===2">
         <div style="font-size:72px;margin-bottom:12px;animation:petFloat 3s ease-in-out infinite;">
-          {{ selectedPetType && selectedPetType.stages[2] }}
+          {{ selectedPetType && selectedPetType.stages[1] }}
         </div>
         <h2 style="font-size:22px;font-weight:900;color:var(--text-dark);margin-bottom:6px;">给你的宠物起个名字</h2>
         <p style="color:var(--text-light);font-size:14px;margin-bottom:20px;">一个好名字会让它更有活力！</p>
@@ -1157,27 +1305,29 @@ const HatchPage = {
         </div>
         <div style="display:flex;gap:10px;justify-content:center;">
           <button class="btn btn-ghost" @click="step=1">← 重新选择</button>
-          <button class="btn btn-primary btn-lg" @click="startHatch">🥚 开始孵化！</button>
+          <button class="btn btn-primary btn-lg" @click="startHatch">🌟 开始冒险！</button>
         </div>
       </div>
 
-      <!-- 步骤3：孵化动画 -->
+      <!-- 步骤3：领取动画 -->
       <div v-if="step===3">
         <div style="padding:40px 0">
-          <div style="font-size:120px;animation:hatch 2.5s ease-in-out infinite;display:block;margin:0 auto;">🥚</div>
-          <div style="font-size:18px;font-weight:700;color:var(--primary);margin-top:20px;" class="animate-blink">✨ 正在孵化中... ✨</div>
-          <p style="color:var(--text-light);font-size:14px;margin-top:8px;">宠物即将破壳而出！</p>
+          <div style="font-size:100px;animation:petFloat 2s ease-in-out infinite;display:block;margin:0 auto;">
+            {{ selectedPetType && selectedPetType.stages[0] }}
+          </div>
+          <div style="font-size:18px;font-weight:700;color:var(--primary);margin-top:20px;" class="animate-blink">✨ 正在加入中... ✨</div>
+          <p style="color:var(--text-light);font-size:14px;margin-top:8px;">你的新伙伴即将到来！</p>
         </div>
       </div>
 
-      <!-- 步骤4：孵化完成 -->
+      <!-- 步骤4：领取完成 -->
       <div v-if="step===4">
         <div style="font-size:100px;margin-bottom:12px;animation:levelUp 1s ease;">
-          {{ selectedPetType && selectedPetType.stages[1] }}
+          {{ selectedPetType && selectedPetType.stages[0] }}
         </div>
         <div style="background:linear-gradient(135deg,#FF6B9D,#7C4DFF);color:white;border-radius:20px;padding:20px;margin-bottom:20px;">
-          <div style="font-size:24px;font-weight:900;margin-bottom:6px;">🎉 孵化成功！</div>
-          <div style="font-size:16px;opacity:0.9;">「{{ petName || selectedPetType.name }}」已经破壳而出</div>
+          <div style="font-size:24px;font-weight:900;margin-bottom:6px;">🎉 领取成功！</div>
+          <div style="font-size:16px;opacity:0.9;">「{{ petName || selectedPetType.name }}」正式加入</div>
           <div style="font-size:13px;opacity:0.75;margin-top:6px;">完成学习任务，帮助它快速成长吧！</div>
         </div>
         <button class="btn btn-primary btn-lg" style="width:100%;max-width:300px" @click="finish">
@@ -1263,7 +1413,14 @@ const StudentHomePage = {
       <!-- 欢迎横幅 -->
       <div class="card" style="padding:20px;margin-bottom:16px;background:linear-gradient(135deg,#FF6B9D,#7C4DFF);color:white;border:none;">
         <div style="display:flex;align-items:center;gap:16px;">
-          <div style="font-size:56px;animation:petFloat 3s ease-in-out infinite;">{{ petEmoji }}</div>
+          <!-- 宠物：优先显示自定义头像 > 宠物图片 > emoji -->
+          <div v-if="student.avatar && student.avatar.startsWith('data:')" style="width:80px;height:80px;border-radius:50%;overflow:hidden;border:3px solid rgba(255,255,255,0.5);box-shadow:0 4px 12px rgba(0,0,0,0.2);animation:petFloat 3s ease-in-out infinite;">
+            <img :src="student.avatar" style="width:100%;height:100%;object-fit:cover;" />
+          </div>
+          <div v-else-if="student.petImage" style="width:80px;height:80px;border-radius:50%;overflow:hidden;border:3px solid rgba(255,255,255,0.5);box-shadow:0 4px 12px rgba(0,0,0,0.2);animation:petFloat 3s ease-in-out infinite;">
+            <img :src="student.petImage" style="width:100%;height:100%;object-fit:cover;" />
+          </div>
+          <div v-else style="font-size:56px;animation:petFloat 3s ease-in-out infinite;">{{ petEmoji }}</div>
           <div style="flex:1">
             <div style="font-size:20px;font-weight:900;">{{ greeting }} {{ student.name }}！</div>
             <div style="font-size:13px;opacity:0.85;margin-top:3px;">{{ student.petName }} 在等你回来玩～</div>
@@ -1507,24 +1664,24 @@ const StudentApp = {
   template: `
     <div style="min-height:100vh;background:var(--bg-main);" @click="showAvatarMenu=false">
       <!-- 学生选择界面（横屏双栏 / 竖屏单栏） -->
-      <div v-if="showStudentSelect" style="min-height:100vh;background:var(--bg-main);display:flex;flex-direction:column;">
+      <div v-if="showStudentSelect" class="picker-page">
 
         <!-- 标题区 -->
-        <div style="text-align:center;padding:24px 20px 12px;">
-          <div style="font-size:40px;margin-bottom:8px;">🐾</div>
-          <h1 style="font-size:22px;font-weight:900;color:var(--text-dark);margin-bottom:4px;">课堂宠物</h1>
-          <p style="font-size:13px;color:var(--text-light);">请选择你的名字</p>
+        <div class="picker-header">
+          <div class="picker-logo">🐾</div>
+          <h1 class="picker-title">课堂宠物</h1>
+          <p class="picker-subtitle">请选择你的名字</p>
         </div>
 
         <!-- 无学生时显示引导页 -->
-        <div v-if="pickerStudents.length === 0" style="flex:1;display:flex;align-items:center;justify-content:center;padding:20px;">
-          <div style="background:white;border:2px solid var(--border);border-radius:20px;padding:32px 24px;box-shadow:0 4px 20px rgba(0,0,0,0.05);text-align:center;width:100%;max-width:360px;">
-            <div style="font-size:48px;margin-bottom:16px;">👨‍🏫</div>
-            <h2 style="font-size:18px;font-weight:900;color:var(--text-dark);margin-bottom:8px;">暂无学生账号</h2>
-            <p style="font-size:14px;color:var(--text-mid);line-height:1.6;margin-bottom:20px;">
+        <div v-if="pickerStudents.length === 0" class="picker-empty">
+          <div class="picker-empty-card">
+            <div class="picker-empty-icon">👨‍🏫</div>
+            <h2 class="picker-empty-title">暂无学生账号</h2>
+            <p class="picker-empty-desc">
               请先由教师在「系统设置」中添加学生账号，或切换到教师端初始化演示数据。
             </p>
-            <div style="display:flex;flex-direction:column;gap:10px;">
+            <div class="picker-empty-actions">
               <button class="btn btn-primary" style="width:100%;" @click="$parent.switchMode && $parent.switchMode('teacher')">
                 👨‍🏫 进入教师端
               </button>
@@ -1535,123 +1692,126 @@ const StudentApp = {
           </div>
         </div>
 
-        <!-- 有学生时显示：搜索框（固定不随页面滚动） -->
-        <div v-if="pickerStudents.length > 0" style="padding:0 16px 12px;position:sticky;top:0;z-index:10;background:var(--bg-main);">
-          <input class="input-field"
-                 v-model="pickerSearch"
-                 placeholder="🔍 搜索姓名或拼音首字母..."
-                 style="width:100%;padding:10px 16px;font-size:14px;border-radius:50px;" />
-        </div>
+        <!-- 有学生时的主体布局 -->
+        <template v-if="pickerStudents.length > 0">
+          <!-- 搜索框：固定在顶部，不随页面滚动 -->
+          <div class="picker-search-wrap">
+            <div class="picker-search-icon">🔍</div>
+            <input class="picker-search-input"
+                   v-model="pickerSearch"
+                   placeholder="搜索姓名或拼音首字母..."
+                   @input="onPickerSearch" />
+            <button v-if="pickerSearch" class="picker-search-clear" @click="pickerSearch='';onPickerSearch()">✕</button>
+          </div>
 
-        <!-- 有学生时主体内容 -->
-        <div v-if="pickerStudents.length > 0" style="flex:1;overflow:hidden;display:flex;gap:0;padding:0 12px 16px;">
+          <!-- 主体区域：flex 布局 -->
+          <div class="picker-body">
 
-          <!-- ===== 左侧：学生选择 ===== -->
-          <div style="flex:1;overflow-y:auto;padding-right:8px;"
-               :style="pickerLandscape ? 'max-height:calc(100vh - 220px);' : ''">
+            <!-- ===== 左侧/主区：首字母索引 + 学生卡片 ===== -->
+            <div class="picker-main" ref="pickerScrollArea">
 
-            <!-- 首字母索引（横屏：左侧固定；竖屏：顶部横向滚动） -->
-            <div style="margin-bottom:12px;">
-              <!-- 横屏：单列首字母垂直列表 -->
-              <div v-if="pickerLandscape"
-                   style="display:flex;flex-direction:column;gap:4px;margin-bottom:10px;">
-                <div v-for="letter in availableLetters" :key="letter"
-                     @click="scrollToLetter(letter)"
-                     :style="'font-size:12px;font-weight:' + (pickerActiveLetter===letter ? '900' : '600') + ';color:' + (pickerActiveLetter===letter ? 'var(--primary)' : 'var(--text-mid)') + ';cursor:pointer;padding:3px 6px;border-radius:4px;' + (pickerActiveLetter===letter ? 'background:rgba(124,77,255,0.1);' : '')">
+              <!-- 首字母索引栏 -->
+              <div class="picker-index-bar" :class="{ 'picker-index-vertical': pickerLandscape }">
+                <button v-for="letter in availableLetters" :key="letter"
+                        class="picker-index-btn"
+                        :class="{ 'active': pickerActiveLetter === letter }"
+                        @click="scrollToLetter(letter)">
                   {{ letter }}
-                </div>
+                </button>
               </div>
-              <!-- 竖屏：横向滚动首字母 -->
-              <div v-else
-                   style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none;-ms-overflow-style:none;"
-                   :style="pickerLandscape ? '' : 'margin-bottom:10px;'">
-                <div v-for="letter in availableLetters" :key="letter"
-                     @click="scrollToLetter(letter)"
-                     :style="'flex-shrink:0;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:' + (pickerActiveLetter===letter ? '900' : '600') + ';cursor:pointer;' + (pickerActiveLetter===letter ? 'background:var(--primary);color:white;' : 'background:white;border:1px solid var(--border);color:var(--text-mid);')">
-                  {{ letter }}
-                </div>
-              </div>
-            </div>
 
-            <!-- 按首字母分组显示学生 -->
-            <div v-for="letter in availableLetters" :key="letter" :id="'picker-group-' + letter">
-              <!-- 分组标题 -->
-              <div style="font-size:13px;font-weight:900;color:var(--primary);padding:6px 0 4px;
-                          border-bottom:1.5px solid rgba(124,77,255,0.15);margin-bottom:8px;display:flex;align-items:center;gap:6px;">
-                <span style="background:var(--primary);color:white;border-radius:50%;width:22px;height:22px;
-                             display:inline-flex;align-items:center;justify-content:center;font-size:12px;">{{ letter }}</span>
-                <span>{{ letter }}</span>
-                <span style="font-size:11px;color:var(--text-light);font-weight:400;">（{{ groupedPickerStudents[letter].length }}人）</span>
-              </div>
-              <!-- 学生卡片（横屏3列，竖屏3列） -->
-              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;">
-                <div v-for="s in groupedPickerStudents[letter]" :key="s.id"
-                     style="background:white;border:2px solid var(--border);border-radius:12px;padding:10px 6px;
-                            cursor:pointer;text-align:center;transition:all 0.2s;"
-                     @click="selectStudent(s)"
-                     @mouseenter="e => { e.currentTarget.style.borderColor='var(--primary)'; e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 4px 12px rgba(124,77,255,0.15)'; }"
-                     @mouseleave="e => { e.currentTarget.style.borderColor='var(--border)'; e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.boxShadow='none'; }">
-                  <!-- 头像 -->
-                  <div style="width:48px;height:48px;border-radius:50%;overflow:hidden;margin:0 auto 6px;
-                              background:var(--bg-card);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:900;color:var(--primary);border:1.5px solid var(--border);">
-                    <img v-if="s.avatar" :src="s.avatar" style="width:100%;height:100%;object-fit:cover;" />
-                    <span v-else>{{ s.name && s.name[0] }}</span>
+              <!-- 按首字母分组的学生卡片列表 -->
+              <div class="picker-groups">
+                <div v-for="letter in availableLetters" :key="letter" :id="'picker-group-' + letter" class="picker-group">
+                  <!-- 分组标题 -->
+                  <div class="picker-group-header">
+                    <span class="picker-group-badge">{{ letter }}</span>
+                    <span class="picker-group-name">{{ letter }}</span>
+                    <span class="picker-group-count">{{ groupedPickerStudents[letter].length }}人</span>
                   </div>
-                  <!-- 名字（超长截断） -->
-                  <div style="font-size:13px;font-weight:800;color:var(--text-dark);margin-bottom:2px;
-                              overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ s.name }}</div>
-                  <div style="font-size:11px;color:var(--text-light);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ s.class }}</div>
+                  <!-- 3列网格卡片 -->
+                  <div class="picker-grid">
+                    <div v-for="s in groupedPickerStudents[letter]" :key="s.id"
+                         class="picker-card"
+                         @click="selectStudent(s)">
+                      <!-- 头像 -->
+                      <div class="picker-card-avatar">
+                        <img v-if="s.avatar" :src="s.avatar" />
+                        <span v-else class="picker-card-initial">{{ s.name && s.name[0] }}</span>
+                      </div>
+                      <!-- 名字 -->
+                      <div class="picker-card-name">{{ s.name }}</div>
+                      <div class="picker-card-class">{{ s.class }}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 搜索无结果提示 -->
+                <div v-if="filteredPickerStudents.length === 0 && pickerSearch" class="picker-no-result">
+                  <div class="picker-no-result-icon">🔍</div>
+                  <div>没有找到包含「{{ pickerSearch }}」的学生</div>
                 </div>
               </div>
             </div>
 
-            <!-- 搜索无结果提示 -->
-            <div v-if="filteredPickerStudents.length === 0 && pickerSearch" style="text-align:center;padding:40px 0;color:var(--text-light);">
-              <div style="font-size:32px;margin-bottom:8px;">🔍</div>
-              <div style="font-size:14px;">没有找到包含「{{ pickerSearch }}」的学生</div>
+            <!-- ===== 右侧：排行榜（仅横屏） ===== -->
+            <div v-if="pickerLandscape" class="picker-sidebar">
+              <!-- 积分榜 -->
+              <div class="picker-rank-section">
+                <div class="picker-rank-title picker-rank-title--points">⭐ 积分排行</div>
+                <div v-for="(s, i) in rankByPoints" :key="'p'+s.id" class="picker-rank-item">
+                  <span class="picker-rank-num" :class="{'rank-top': i<3}">{{ i+1 }}</span>
+                  <div class="picker-rank-avatar">
+                    <img v-if="s.avatar" :src="s.avatar" />
+                    <span v-else>{{ (s.name||'')[0] }}</span>
+                  </div>
+                  <div class="picker-rank-info">
+                    <div class="picker-rank-name">{{ s.name }}</div>
+                    <div class="picker-rank-score">{{ s.points||0 }} 分</div>
+                  </div>
+                </div>
+              </div>
+              <!-- 宠物经验榜 -->
+              <div v-if="rankByPetExp.length > 0" class="picker-rank-section">
+                <div class="picker-rank-title picker-rank-title--pet">🐾 宠物经验</div>
+                <div v-for="(s, i) in rankByPetExp" :key="'e'+s.id" class="picker-rank-item">
+                  <span class="picker-rank-num" :class="{'rank-top': i<3}">{{ i+1 }}</span>
+                  <div class="picker-rank-emoji">{{ getStudentPetEmoji(s) }}</div>
+                  <div class="picker-rank-info">
+                    <div class="picker-rank-name">{{ s.name }}</div>
+                    <div class="picker-rank-score">{{ s.petExp||0 }} exp</div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
-          <!-- ===== 右侧：排行榜（仅横屏显示） ===== -->
-          <div v-if="pickerLandscape" style="width:220px;flex-shrink:0;overflow-y:auto;padding-left:8px;border-left:1px solid var(--border);max-height:calc(100vh - 220px);">
-            <!-- 积分榜 -->
-            <div style="margin-bottom:16px;">
-              <div style="font-size:12px;font-weight:900;color:var(--primary);margin-bottom:8px;padding-bottom:4px;border-bottom:1.5px solid rgba(124,77,255,0.2);">
-                ⭐ 积分排行
-              </div>
-              <div v-for="(s, i) in rankByPoints" :key="s.id"
-                   style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid rgba(0,0,0,0.04);">
-                <span style="font-size:11px;font-weight:900;color:var(--text-light);width:16px;flex-shrink:0;">{{ i+1 }}</span>
-                <div style="width:24px;height:24px;border-radius:50%;overflow:hidden;background:var(--bg-card);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px;">
-                  <img v-if="s.avatar" :src="s.avatar" style="width:100%;height:100%;object-fit:cover;" />
-                  <span v-else>{{ (s.name||'')[0] }}</span>
-                </div>
-                <div style="flex:1;min-width:0;">
-                  <div style="font-size:12px;font-weight:700;color:var(--text-dark);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ s.name }}</div>
-                  <div style="font-size:10px;color:var(--text-light);">{{ s.points||0 }}分</div>
+          <!-- 竖屏排行榜（放在底部） -->
+          <div v-if="!pickerLandscape" class="picker-mobile-ranks">
+            <div class="picker-mrank-row">
+              <div class="picker-mrank-block">
+                <div class="picker-rank-title picker-rank-title--points">⭐ 积分 TOP5</div>
+                <div v-for="(s, i) in rankByPoints" :key="'mp'+s.id" class="picker-mrank-item">
+                  <span class="picker-mrank-num">{{ i+1 }}</span>
+                  <span class="picker-mrank-name">{{ s.name }}</span>
+                  <span class="picker-mrank-score">{{ s.points||0 }}分</span>
                 </div>
               </div>
-            </div>
-            <!-- 宠物经验榜 -->
-            <div v-if="rankByPetExp.length > 0" style="margin-bottom:16px;">
-              <div style="font-size:12px;font-weight:900;color:#4CAF50;margin-bottom:8px;padding-bottom:4px;border-bottom:1.5px solid rgba(76,175,80,0.2);">
-                🐾 宠物经验
-              </div>
-              <div v-for="(s, i) in rankByPetExp" :key="s.id"
-                   style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid rgba(0,0,0,0.04);">
-                <span style="font-size:11px;font-weight:900;color:var(--text-light);width:16px;flex-shrink:0;">{{ i+1 }}</span>
-                <div style="font-size:16px;flex-shrink:0;">{{ getStudentPetEmoji(s) }}</div>
-                <div style="flex:1;min-width:0;">
-                  <div style="font-size:12px;font-weight:700;color:var(--text-dark);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ s.name }}</div>
-                  <div style="font-size:10px;color:var(--text-light);">{{ s.petExp||0 }} exp</div>
+              <div v-if="rankByPetExp.length > 0" class="picker-mrank-block">
+                <div class="picker-rank-title picker-rank-title--pet">🐾 经验 TOP5</div>
+                <div v-for="(s, i) in rankByPetExp" :key="'me'+s.id" class="picker-mrank-item">
+                  <span class="picker-mrank-num">{{ i+1 }}</span>
+                  <span class="picker-mrank-emoji">{{ getStudentPetEmoji(s) }}</span>
+                  <span class="picker-mrank-name">{{ s.name }}</span>
+                  <span class="picker-mrank-score">{{ s.petExp||0}}</span>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        </template>
 
         <!-- 版权信息 -->
-        <div style="text-align:center;padding:12px;font-size:11px;color:var(--text-light);border-top:1px solid var(--border);">
+        <div class="picker-footer">
           Made by Qin_zzq · Copyright © 2026
         </div>
       </div>
@@ -1756,24 +1916,25 @@ const StudentApp = {
         <div style="font-size:60px;margin-top:10px;">{{ student && getStudentPetEmoji(student) }}</div>
       </div>
 
-      <!-- 💔 宠物死亡弹窗 -->
+      <!-- 💀 宠物死亡弹窗 -->
       <div v-if="showPetDeadNotify" class="modal-overlay" style="z-index:9999;background:rgba(0,0,0,0.75);"
            @click.self="showPetDeadNotify=false">
         <div class="modal-box" style="text-align:center;max-width:320px;padding:32px 24px;">
-          <div style="font-size:64px;margin-bottom:8px;animation:petFloat 2s ease-in-out infinite;">🥚</div>
-          <div style="font-size:20px;font-weight:900;color:#E53935;margin-bottom:8px;">宠物饿死了...</div>
+          <div style="font-size:64px;margin-bottom:8px;animation:petFloat 2s ease-in-out infinite;">💀</div>
+          <div style="font-size:20px;font-weight:900;color:#E53935;margin-bottom:8px;">宠物已死亡...</div>
           <div style="font-size:14px;color:var(--text-mid);line-height:1.6;margin-bottom:12px;">
-            超过 <strong>7天</strong> 没有喂食了<br>
-            宠物饿死，变回了一颗蛋 😢<br>
+            超过 <strong>14天</strong> 没有互动了<br>
+            宠物进入了永恒的沉睡 😢<br>
             <span v-if="petDeadInfo && petDeadInfo.pointLost > 0" style="color:#F44336;">
               你损失了 {{ petDeadInfo.pointLost }} 积分（全部清零）
             </span>
           </div>
-          <div style="background:#FFF3E0;border-radius:12px;padding:12px;margin-bottom:16px;font-size:13px;color:#E65100;">
-            💡 每天用食物道具喂食它，累计喂 <strong>3 次</strong>就能重新孵化！
+          <div style="background:#FFEBEE;border-radius:12px;padding:12px;margin-bottom:16px;font-size:13px;color:#C62828;">
+            ⚠️ 喂食可以复活宠物，但经验会清零！<br>
+            等级将重置为0级，重新开始成长。
           </div>
           <button class="btn btn-primary" style="width:100%;" @click="showPetDeadNotify=false;navTo('pet')">
-            去喂食孵化宠物 🥚
+            去喂食复活宠物 🐾
           </button>
         </div>
       </div>
@@ -1953,7 +2114,19 @@ const StudentApp = {
     scrollToLetter(letter) {
       this.pickerActiveLetter = letter;
       const el = document.getElementById('picker-group-' + letter);
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (el) {
+        const scrollArea = this.$refs.pickerScrollArea;
+        if (scrollArea) {
+          const offsetTop = el.offsetTop - scrollArea.offsetTop;
+          scrollArea.scrollTo({ top: offsetTop - 8, behavior: 'smooth' });
+        } else {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }
+    },
+    // 搜索输入时清除高亮
+    onPickerSearch() {
+      this.pickerActiveLetter = null;
     },
     async onAvatarFileChange(e) {
       const file = e.target.files && e.target.files[0];
@@ -1966,13 +2139,20 @@ const StudentApp = {
       const reader = new FileReader();
       reader.onload = async (ev) => {
         const base64 = ev.target.result;
-        const sid = this.selectedStudentId || (this.student && this.student.id);
-        if (!sid) return;
+        // 优先使用 selectedStudentId，如果没有则使用 user.id
+        const sid = this.selectedStudentId || (this.user && this.user.id);
+        if (!sid) {
+          console.error('[onAvatarFileChange] 无法获取学生ID:', { selectedStudentId: this.selectedStudentId, userId: this.user?.id });
+          Store.toast('无法上传：学生信息缺失', 'error');
+          return;
+        }
         const ok = await Store.updateAvatar(sid, base64);
         if (ok) {
           await this.refreshStudent();
           this.showAvatarUpload = false;
           Store.toast('✅ 头像已更新', 'success');
+        } else {
+          Store.toast('上传失败：未找到学生', 'error');
         }
       };
       reader.readAsDataURL(file);

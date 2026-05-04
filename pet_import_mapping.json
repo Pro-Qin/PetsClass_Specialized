@@ -1,0 +1,528 @@
+{
+  "generated_at": "2026-04-12T11:58:18.452276",
+  "total_students": 52,
+  "matched_count": 38,
+  "generic_count": 21,
+  "unmatched_students": [
+    "谢美果儿",
+    "陈亦佳",
+    "肖雯婕",
+    "高梦扬",
+    "钟天悦",
+    "周浩添",
+    "刘鹏",
+    "陈硕",
+    "吴小博",
+    "王家粱",
+    "江帅",
+    "陈旭明",
+    "吴嘉伟",
+    "朱钰豪"
+  ],
+  "students": {
+    "张钰彤": {
+      "excel_pet": "猫",
+      "images": [
+        "猫0.png"
+      ],
+      "primary_image": "猫0.png",
+      "has_multi_states": false,
+      "generic_assigned": true,
+      "emoji": null
+    },
+    "刘芷宁": {
+      "excel_pet": "时透无一郎",
+      "images": [
+        "刘芷宁的时透无一郎.jpg"
+      ],
+      "primary_image": "刘芷宁的时透无一郎.jpg",
+      "has_multi_states": false,
+      "generic_assigned": false,
+      "emoji": null
+    },
+    "李子悦": {
+      "excel_pet": "猫",
+      "images": [
+        "猫1.png"
+      ],
+      "primary_image": "猫1.png",
+      "has_multi_states": false,
+      "generic_assigned": true,
+      "emoji": null
+    },
+    "邵涵蕊": {
+      "excel_pet": "仓鼠",
+      "images": [
+        "猫2.png"
+      ],
+      "primary_image": "猫2.png",
+      "has_multi_states": false,
+      "generic_assigned": true,
+      "emoji": "🐹"
+    },
+    "徐梦妍": {
+      "excel_pet": "猫",
+      "images": [
+        "猫3.png"
+      ],
+      "primary_image": "猫3.png",
+      "has_multi_states": false,
+      "generic_assigned": true,
+      "emoji": null
+    },
+    "张文慧": {
+      "excel_pet": "小香猪",
+      "images": [
+        "张文慧小香猪.png"
+      ],
+      "primary_image": "张文慧小香猪.png",
+      "has_multi_states": false,
+      "generic_assigned": false,
+      "emoji": null
+    },
+    "金莹": {
+      "excel_pet": "雪狐",
+      "images": [
+        "金莹的雪狐.png"
+      ],
+      "primary_image": "金莹的雪狐.png",
+      "has_multi_states": false,
+      "generic_assigned": false,
+      "emoji": "xuehu"
+    },
+    "张微": {
+      "excel_pet": "狐狸",
+      "images": [
+        "猫4.png"
+      ],
+      "primary_image": "猫4.png",
+      "has_multi_states": false,
+      "generic_assigned": true,
+      "emoji": "🦊"
+    },
+    "李文婷": {
+      "excel_pet": "兔子",
+      "images": [
+        "猫5.png"
+      ],
+      "primary_image": "猫5.png",
+      "has_multi_states": false,
+      "generic_assigned": true,
+      "emoji": "🐇"
+    },
+    "张子涵": {
+      "excel_pet": "锦鲤",
+      "images": [
+        "张子涵锦鲤.png"
+      ],
+      "primary_image": "张子涵锦鲤.png",
+      "has_multi_states": false,
+      "generic_assigned": false,
+      "emoji": "jinli"
+    },
+    "jinli": {
+      "excel_pet": "狐狸",
+      "images": [
+        "猫6.png"
+      ],
+      "primary_image": "猫6.png",
+      "has_multi_states": false,
+      "generic_assigned": true,
+      "emoji": "2.0"
+    },
+    "袁誉晟": {
+      "excel_pet": "卡提希娅",
+      "images": [
+        "袁誉晟卡提希娅.png"
+      ],
+      "primary_image": "袁誉晟卡提希娅.png",
+      "has_multi_states": false,
+      "generic_assigned": false,
+      "emoji": null
+    },
+    "杨予泽": {
+      "excel_pet": "狗",
+      "images": [
+        "狗1.png"
+      ],
+      "primary_image": "狗1.png",
+      "has_multi_states": false,
+      "generic_assigned": true,
+      "emoji": null
+    },
+    "胡浩扬": {
+      "excel_pet": "佩奇",
+      "images": [
+        "胡浩扬佩奇.jpg"
+      ],
+      "primary_image": "胡浩扬佩奇.jpg",
+      "has_multi_states": false,
+      "generic_assigned": false,
+      "emoji": null
+    },
+    "袁俊婷": {
+      "excel_pet": "白狐",
+      "images": [
+        "袁俊婷的小鞠.jpg"
+      ],
+      "primary_image": "袁俊婷的小鞠.jpg",
+      "has_multi_states": false,
+      "generic_assigned": false,
+      "emoji": null
+    },
+    "王志宇": {
+      "excel_pet": "佛雷迪",
+      "images": [
+        "王志宇佛雷迪.png"
+      ],
+      "primary_image": "王志宇佛雷迪.png",
+      "has_multi_states": false,
+      "generic_assigned": false,
+      "emoji": null
+    },
+    "张智钦": {
+      "excel_pet": "哥伦比娅",
+      "images": [
+        "张智钦哥伦比娅.png"
+      ],
+      "primary_image": "张智钦哥伦比娅.png",
+      "has_multi_states": false,
+      "generic_assigned": false,
+      "emoji": null
+    },
+    "洪文乐": {
+      "excel_pet": "乔治",
+      "images": [
+        "洪文乐乔治.png"
+      ],
+      "primary_image": "洪文乐乔治.png",
+      "has_multi_states": false,
+      "generic_assigned": false,
+      "emoji": null
+    },
+    "张可珍": {
+      "excel_pet": "布偶猫",
+      "images": [
+        "张可珍的缅因.jpg"
+      ],
+      "primary_image": "张可珍的缅因.jpg",
+      "has_multi_states": false,
+      "generic_assigned": false,
+      "emoji": null
+    },
+    "邓文浩": {
+      "excel_pet": "宿反佳",
+      "images": [
+        "邓文浩宿反佳.png"
+      ],
+      "primary_image": "邓文浩宿反佳.png",
+      "has_multi_states": false,
+      "generic_assigned": false,
+      "emoji": null
+    },
+    "张宇阳": {
+      "excel_pet": "佩利卡",
+      "images": [
+        "张宇阳佩利卡.png"
+      ],
+      "primary_image": "张宇阳佩利卡.png",
+      "has_multi_states": false,
+      "generic_assigned": false,
+      "emoji": null
+    },
+    "李文昊": {
+      "excel_pet": "五条悟",
+      "images": [
+        "李文昊五条悟.WEBP"
+      ],
+      "primary_image": "李文昊五条悟.WEBP",
+      "has_multi_states": false,
+      "generic_assigned": false,
+      "emoji": null
+    },
+    "鲍玉心": {
+      "excel_pet": "卡皮巴拉",
+      "images": [
+        "鲍玉心卡皮巴拉.WEBP"
+      ],
+      "primary_image": "鲍玉心卡皮巴拉.WEBP",
+      "has_multi_states": false,
+      "generic_assigned": false,
+      "emoji": null
+    },
+    "丁诗议": {
+      "excel_pet": "Q版兹白",
+      "images": [
+        "丁诗议Q版兹白_angry.png",
+        "丁诗议Q版兹白_happy.png",
+        "丁诗议Q版兹白_sadness.png"
+      ],
+      "primary_image": "丁诗议Q版兹白_angry.png",
+      "has_multi_states": true,
+      "generic_assigned": false,
+      "states": {
+        "丁诗议Q版兹白_angry.png": "angry",
+        "丁诗议Q版兹白_happy.png": "happy",
+        "丁诗议Q版兹白_sadness.png": "sadness"
+      },
+      "emoji": null
+    },
+    "王尔杰": {
+      "excel_pet": "奇美拉",
+      "images": [
+        "王尔杰奇美拉.WEBP"
+      ],
+      "primary_image": "王尔杰奇美拉.WEBP",
+      "has_multi_states": false,
+      "generic_assigned": false,
+      "emoji": null
+    },
+    "李雪虎": {
+      "excel_pet": "雪豹",
+      "images": [
+        "李雪虎雪豹.PNG"
+      ],
+      "primary_image": "李雪虎雪豹.PNG",
+      "has_multi_states": false,
+      "generic_assigned": false,
+      "emoji": null
+    },
+    "周琳杰": {
+      "excel_pet": "奶狗",
+      "images": [
+        "周琳杰奶狗.WEBP"
+      ],
+      "primary_image": "周琳杰奶狗.WEBP",
+      "has_multi_states": false,
+      "generic_assigned": false,
+      "emoji": null
+    },
+    "刘云昊": {
+      "excel_pet": "熊猫犬",
+      "images": [
+        "刘云昊熊猫犬.PNG"
+      ],
+      "primary_image": "刘云昊熊猫犬.PNG",
+      "has_multi_states": false,
+      "generic_assigned": false,
+      "emoji": null
+    },
+    "黄思博": {
+      "excel_pet": "苏西",
+      "images": [
+        "黄思博苏西.jpg"
+      ],
+      "primary_image": "黄思博苏西.jpg",
+      "has_multi_states": false,
+      "generic_assigned": false,
+      "emoji": null
+    },
+    "陈国寅": {
+      "excel_pet": "乌鲁鲁",
+      "images": [
+        "陈国寅乌鲁鲁.WEBP"
+      ],
+      "primary_image": "陈国寅乌鲁鲁.WEBP",
+      "has_multi_states": false,
+      "generic_assigned": false,
+      "emoji": null
+    },
+    "杨振军": {
+      "excel_pet": "爱泼斯坦",
+      "images": [
+        "杨振军爱泼斯坦.webp"
+      ],
+      "primary_image": "杨振军爱泼斯坦.webp",
+      "has_multi_states": false,
+      "generic_assigned": false,
+      "emoji": null
+    },
+    "上官雨辰": {
+      "excel_pet": "Q 叶瞬光",
+      "images": [
+        "上官雨辰Q 叶瞬光.WEBP"
+      ],
+      "primary_image": "上官雨辰Q 叶瞬光.WEBP",
+      "has_multi_states": false,
+      "generic_assigned": false,
+      "emoji": null
+    },
+    "陈鑫": {
+      "excel_pet": "狗蜂",
+      "images": [
+        "陈鑫狗蜂.jpg"
+      ],
+      "primary_image": "陈鑫狗蜂.jpg",
+      "has_multi_states": false,
+      "generic_assigned": false,
+      "emoji": null
+    },
+    "盛一达": {
+      "excel_pet": "狗",
+      "images": [
+        "狗2.png"
+      ],
+      "primary_image": "狗2.png",
+      "has_multi_states": false,
+      "generic_assigned": true,
+      "emoji": null
+    },
+    "熊冠翔": {
+      "excel_pet": "洁尔佩塔",
+      "images": [
+        "熊冠翔洁尔佩塔1.png",
+        "熊冠翔洁尔佩塔2.png"
+      ],
+      "primary_image": "熊冠翔洁尔佩塔1.png",
+      "has_multi_states": true,
+      "generic_assigned": false,
+      "states": {
+        "熊冠翔洁尔佩塔1.png": "default",
+        "熊冠翔洁尔佩塔2.png": "default"
+      },
+      "emoji": null
+    },
+    "王志屿": {
+      "excel_pet": "徐业磊",
+      "images": [
+        "王志屿徐业磊.PNG"
+      ],
+      "primary_image": "王志屿徐业磊.PNG",
+      "has_multi_states": false,
+      "generic_assigned": false,
+      "emoji": null
+    },
+    "余政洋": {
+      "excel_pet": "月灵",
+      "images": [
+        "余政洋月灵.WEBP"
+      ],
+      "primary_image": "余政洋月灵.WEBP",
+      "has_multi_states": false,
+      "generic_assigned": false,
+      "emoji": null
+    },
+    "毛晨泽": {
+      "excel_pet": "Q胡桃",
+      "images": [
+        "毛晨泽Q胡桃.WEBP"
+      ],
+      "primary_image": "毛晨泽Q胡桃.WEBP",
+      "has_multi_states": false,
+      "generic_assigned": false,
+      "emoji": null
+    },
+    "谢美果儿": {
+      "excel_pet": null,
+      "images": [],
+      "primary_image": null,
+      "has_multi_states": false,
+      "generic_assigned": false,
+      "emoji": "🦌"
+    },
+    "陈亦佳": {
+      "excel_pet": null,
+      "images": [],
+      "primary_image": null,
+      "has_multi_states": false,
+      "generic_assigned": false,
+      "emoji": "🐖"
+    },
+    "肖雯婕": {
+      "excel_pet": null,
+      "images": [],
+      "primary_image": null,
+      "has_multi_states": false,
+      "generic_assigned": false,
+      "emoji": "🦊"
+    },
+    "高梦扬": {
+      "excel_pet": null,
+      "images": [],
+      "primary_image": null,
+      "has_multi_states": false,
+      "generic_assigned": false,
+      "emoji": "🐺"
+    },
+    "钟天悦": {
+      "excel_pet": "dog",
+      "images": [],
+      "primary_image": null,
+      "has_multi_states": false,
+      "generic_assigned": false,
+      "emoji": null
+    },
+    "周浩添": {
+      "excel_pet": null,
+      "images": [],
+      "primary_image": null,
+      "has_multi_states": false,
+      "generic_assigned": false,
+      "emoji": "🕷️"
+    },
+    "刘鹏": {
+      "excel_pet": null,
+      "images": [],
+      "primary_image": null,
+      "has_multi_states": false,
+      "generic_assigned": false,
+      "emoji": "🐧"
+    },
+    "陈硕": {
+      "excel_pet": null,
+      "images": [],
+      "primary_image": null,
+      "has_multi_states": false,
+      "generic_assigned": false,
+      "emoji": null
+    },
+    "吴小博": {
+      "excel_pet": null,
+      "images": [],
+      "primary_image": null,
+      "has_multi_states": false,
+      "generic_assigned": false,
+      "emoji": null
+    },
+    "王家粱": {
+      "excel_pet": null,
+      "images": [],
+      "primary_image": null,
+      "has_multi_states": false,
+      "generic_assigned": false,
+      "emoji": "🐧"
+    },
+    "江帅": {
+      "excel_pet": null,
+      "images": [],
+      "primary_image": null,
+      "has_multi_states": false,
+      "generic_assigned": false,
+      "emoji": null
+    },
+    "陈旭明": {
+      "excel_pet": null,
+      "images": [],
+      "primary_image": null,
+      "has_multi_states": false,
+      "generic_assigned": false,
+      "emoji": null
+    },
+    "吴嘉伟": {
+      "excel_pet": null,
+      "images": [],
+      "primary_image": null,
+      "has_multi_states": false,
+      "generic_assigned": false,
+      "emoji": null
+    },
+    "朱钰豪": {
+      "excel_pet": null,
+      "images": [],
+      "primary_image": null,
+      "has_multi_states": false,
+      "generic_assigned": false,
+      "emoji": null
+    }
+  }
+}

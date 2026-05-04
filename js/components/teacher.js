@@ -169,7 +169,7 @@ const TeacherStudents = {
       deductStudent: null,      // 扣分对象
       deductPoints: 10,         // 默认扣10分
       deductReason: '',
-      newStudent: { name:'', username:'', password:'123456', class:'' },
+      newStudent: { name:'', username:'', class:'' },
       showConfirmDelete: false,
       deleteStudentId: null,
     };
@@ -192,15 +192,15 @@ const TeacherStudents = {
   },
   methods: {
     async addStudent() {
-      const { name, username, password, class: cls } = this.newStudent;
-      if (!name || !username || !password) {
-        this.$emit('toast', '请填写完整信息', 'warning'); return;
+      const { name, username, class: cls } = this.newStudent;
+      if (!name || !username) {
+        this.$emit('toast', '请填写姓名和账号', 'warning'); return;
       }
-      const result = await Store.addStudent({ name, username, password, class: cls });
+      const result = await Store.addStudent({ name, username, class: cls });
       if (result.success) {
         this.$emit('toast', `✅ 学生 ${name} 添加成功`, 'success');
         this.showAddModal = false;
-        this.newStudent = { name:'', username:'', password:'123456', class:'高一一班' };
+        this.newStudent = { name:'', username:'', class:'高一一班' };
         this._rev++;
       } else {
         this.$emit('toast', result.msg, 'error');
@@ -308,8 +308,7 @@ const TeacherStudents = {
             const result = await Store.addStudent({
               name,
               username,
-              password: '123456', // 默认密码
-              class: '高一一班' // 默认班级
+              class: '高一一班'
             });
 
             // 为学生创建默认宠物
@@ -389,10 +388,6 @@ const TeacherStudents = {
           <div class="input-group">
             <label>账号</label>
             <input class="input-field" v-model="newStudent.username" placeholder="登录账号" />
-          </div>
-          <div class="input-group">
-            <label>初始密码</label>
-            <input class="input-field" v-model="newStudent.password" placeholder="初始密码" />
           </div>
           <div class="input-group">
             <label>班级</label>

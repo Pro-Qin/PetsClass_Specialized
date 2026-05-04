@@ -52,17 +52,17 @@
 
 | 模块 | 功能说明 |
 |------|----------|
-| 🥚 宠物孵化 | 新生学生选择宠物种类、起名、完成孵化流程 |
-| 🐾 宠物养成 | 宠物拥有生命、饱食、心情、清洁四维状态，会随时间衰减 |
+| 🐾 宠物养成 | 学生直接领养小幼宠，宠物拥有生命、饱食、心情、清洁四维状态，会随时间衰减 |
 | 🎮 道具系统 | 用积分在商店购买食物、清洁、玩具、医疗等道具并使用 |
 | ✨ 成长升级 | 宠物拥有多个成长阶段，经验值积累后自动升级并更换形象 |
-| 💀 死亡复活 | 长期未喂食宠物将变回蛋，累计喂食 3 次可重新孵化 |
+| 📷 头像上传 | 学生可上传自定义头像，支持圆形裁剪 |
 | 📋 任务系统 | 教师发布学习任务，学生提交后由教师审核，通过即得积分 |
 | ⭐ 积分系统 | 完成任务获得积分，支持教师手动发放/扣除，记录详细明细 |
 | 🏆 排行榜 | 班级积分排行榜，前三名领奖台特殊展示 |
 | 🎒 背包系统 | 查看已有道具数量，支持分类筛选与直接使用 |
 | 👩‍🏫 教师端 | 任务发布与管理、提交审核（通过/驳回）、手动积分操作 |
 | 🛡️ 管理员端 | 账号管理、班级管理等系统配置 |
+| ☁️ 云端同步 | 基于 Supabase 的云端数据同步，支持上传/下载 |
 | 📱 响应式设计 | 移动端友好，适配课堂平板/手机场景 |
 
 ---
@@ -70,20 +70,29 @@
 ## 🏗️ 项目结构
 
 ```
-pet-system/
+PetsClass_Specialized/
 ├── index.html                 # 入口文件
+├── pet_import.html            # 宠物批量导入工具
+├── 启动系统.bat                # 一键启动本地服务器（Windows）
+├── api/                      # 后端 API（PHP + Supabase）
+│   ├── *.php                 # API 接口文件
+│   └── supabase-setup.sql    # 数据库建表 SQL
+├── assets/                   # 图片资源（宠物、道具等）
 ├── styles/
 │   ├── main.css               # 主样式（布局、组件、主题色）
 │   └── animations.css         # 动画效果（宠物浮动、升级特效等）
-└── js/
-    ├── data.js                # 静态数据（宠物类型、道具配置、初始账号）
-    ├── store.js               # 全局状态管理（数据读写、业务逻辑）
-    ├── app.js                 # Vue 根应用、路由与 Toast 通知
-    └── components/
-        ├── login.js           # 登录页组件
-        ├── student.js         # 学生端全部页面（主页/宠物/任务/排行/背包）
-        ├── teacher.js         # 教师端组件
-        └── admin.js           # 管理员端组件
+├── js/
+│   ├── data.js                # 静态数据（宠物类型、道具配置、初始账号）
+│   ├── store.js               # 全局状态管理（数据读写、业务逻辑）
+│   ├── supabase.js            # 云端同步模块（Supabase）
+│   ├── app.js                 # Vue 根应用、路由与 Toast 通知
+│   └── components/
+│       ├── login.js           # 登录页组件
+│       ├── student.js         # 学生端全部页面（主页/宠物/任务/排行/背包）
+│       ├── teacher.js         # 教师端组件
+│       └── admin.js           # 管理员端组件
+├── screenshots/               # 项目截图
+└── tools/                    # 工具页面
 ```
 
 ---
@@ -96,10 +105,10 @@ pet-system/
 
 ```bash
 # 克隆仓库
-git clone https://github.com/你的用户名/classroom-pet-system.git
+git clone https://github.com/Pro-Qin/PetsClass_Specialized.git
 
 # 直接用浏览器打开
-open pet-system/index.html
+open PetsClass_Specialized/index.html
 ```
 
 > ⚠️ 部分浏览器对本地 `file://` 协议有限制，推荐使用方式二。
@@ -109,7 +118,7 @@ open pet-system/index.html
 ```bash
 # 使用 VS Code 的 Live Server 插件打开 index.html
 # 或使用 Python 快速启动：
-cd pet-system
+cd PetsClass_Specialized
 python -m http.server 8080
 # 浏览器访问 http://localhost:8080
 ```

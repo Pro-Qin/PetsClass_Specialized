@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🖼️ 头像备份恢复工具 - 课堂宠物系统</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .container {
+      max-width: 680px;
+      margin: 0 auto;
+    }
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    }
+    .header {
+      text-align: center;
+      color: white;
+      padding: 20px 0;
+    }
+    .header h1 { font-size: 26px; margin-bottom: 6px; }
+    .header p { opacity: 0.85; font-size: 14px; }
+
+    h2 { font-size: 16px; font-weight: 700; margin-bottom: 14px; color: #333; }
+    h3 { font-size: 14px; font-weight: 600; color: #555; margin-bottom: 8px; }
+
+    .info-box {
+      background: #FFF8E1;
+      border-left: 4px solid #FFC107;
+      padding: 12px 16px;
+      border-radius: 0 8px 8px 0;
+      font-size: 13px;
+      color: #5D4037;
+      line-height: 1.7;
+      margin-bottom: 20px;
+    }
+    .info-box strong { color: #333; }
+
+    .step-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 14px;
+      border-radius: 10px;
+      margin-bottom: 10px;
+      border: 1px solid #eee;
+    }
+    .step-row.export-style { background: #F8F4FF; border-color: #D1B3FF; }
+    .step-row.import-style { background: #F0FFF4; border-color: #A5D6A7; }
+    .step-num {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .export-style .step-num { background: #7C4DFF; color: white; }
+    .import-style .step-num { background: #2E7D32; color: white; }
+    .step-content { flex: 1; }
+    .step-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+    .step-desc { font-size: 12px; color: #666; line-height: 1.5; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      width: 100%;
+      margin-top: 10px;
+    }
+    .btn-export {
+      background: linear-gradient(135deg, #7C4DFF 0%, #5E35B1 100%);
+      color: white;
+    }
+    .btn-export:hover { opacity: 0.9; transform: translateY(-1px); }
+    .btn-import {
+      background: linear-gradient(135deg, #2E7D32 0%, #1B5E20 100%);
+      color: white;
+    }
+    .btn-import:hover { opacity: 0.9; transform: translateY(-1px); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .stat-box {
+      background: #F5F5F5;
+      border-radius: 10px;
+      padding: 12px;
+      text-align: center;
+    }
+    .stat-box .num { font-size: 28px; font-weight: 800; color: #7C4DFF; }
+    .stat-box .label { font-size: 11px; color: #999; margin-top: 2px; }
+
+    .result-box {
+      padding: 14px 16px;
+      border-radius: 8px;
+      margin-top: 14px;
+      font-size: 13px;
+      line-height: 1.7;
+      display: none;
+    }
+    .result-box.success { background: #E8F5E9; border: 1px solid #66BB6A; color: #2E7D32; }
+    .result-box.error { background: #FFEBEE; border: 1px solid #EF9A9A; color: #C62828; }
+    .result-box.info { background: #E3F2FD; border: 1px solid #64B5F6; color: #1565C0; }
+
+    .preview-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .avatar-preview {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid #ddd;
+    }
+    .avatar-placeholder {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: #f5f5f5;
+      border: 2px dashed #ccc;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+    }
+    .student-chip {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px 4px 4px;
+      background: #f5f5f5;
+      border-radius: 99px;
+      font-size: 12px;
+    }
+    .student-chip.has-avatar { background: #E8F5E9; }
+    .loading { color: #999; font-size: 13px; }
+
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 8px 0;
+      color: #999;
+      font-size: 12px;
+    }
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      border-top: 1px solid #eee;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🖼️ 头像备份恢复工具</h1>
+      <p>解决拷贝到新环境后头像丢失的问题</p>
+    </div>
+
+    <!-- 原因说明 -->
+    <div class="card">
+      <div class="info-box">
+        <strong>💡 为什么头像会丢失？</strong><br>
+        头像以 base64 格式存在浏览器的 <strong>IndexedDB</strong>（本地数据库）中，这个数据库不随代码文件迁移。<br>
+        换电脑、换浏览器、清除缓存、部署到新服务器——都会导致头像消失。<br><br>
+        <strong>解决方法：</strong>用此工具在旧环境导出头像，再在新环境导入恢复。
+      </div>
+    </div>
+
+    <!-- 当前环境状态 -->
+    <div class="card">
+      <h2>📊 当前环境头像状态</h2>
+      <div id="stats-area" class="loading">正在读取 IndexedDB 数据...</div>
+      <div id="preview-area" class="preview-grid"></div>
+    </div>
+
+    <!-- 导出 -->
+    <div class="card">
+      <h2>📤 在旧环境：导出头像</h2>
+      <div class="step-row export-style">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <div class="step-title">在有头像的旧环境（浏览器）打开此工具</div>
+          <div class="step-desc">确保上方状态面板显示"有 X 个学生有头像"</div>
+        </div>
+      </div>
+      <div class="step-row export-style">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <div class="step-title">点击下方按钮导出头像文件</div>
+          <div class="step-desc">会下载一个 <code>avatars-backup-YYYYMMDD.json</code> 文件，请妥善保存</div>
+        </div>
+      </div>
+      <button id="export-btn" class="btn btn-export" onclick="exportAvatars()">
+        📦 导出头像备份文件
+      </button>
+      <div id="export-result" class="result-box"></div>
+    </div>
+
+    <!-- 导入 -->
+    <div class="card">
+      <h2>📥 在新环境：导入恢复头像</h2>
+      <div class="step-row import-style">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <div class="step-title">在新环境（目标浏览器）打开此工具</div>
+          <div class="step-desc">确保系统数据已正常导入（学生列表不为空）</div>
+        </div>
+      </div>
+      <div class="step-row import-style">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <div class="step-title">选择从旧环境导出的头像备份文件</div>
+          <div class="step-desc">选择 <code>avatars-backup-*.json</code> 文件，工具会自动将头像写回对应学生</div>
+        </div>
+      </div>
+      <button id="import-btn" class="btn btn-import" onclick="document.getElementById('file-input').click()">
+        🔄 选择头像备份文件并恢复
+      </button>
+      <input type="file" id="file-input" accept=".json" style="display:none" onchange="importAvatars(this)">
+      <div id="import-result" class="result-box"></div>
+    </div>
+
+    <!-- 说明 -->
+    <div class="card" style="background:#F9F9F9;">
+      <h2>💡 其他恢复方式</h2>
+      <p style="font-size:13px;color:#666;line-height:1.8;">
+        如果无法访问旧环境，还有以下备选方案：<br>
+        1. <strong>系统内导入 JSON 全量备份</strong>：管理员登录 → 设置 → 数据管理 → 导入 JSON<br>
+        2. <strong>云端同步</strong>：管理员登录 → ☁️ 云端同步 → 点击"📥 恢复头像"（需先在旧环境备份过）<br>
+        3. <strong>让学生重新上传</strong>：登录学生账号 → 宠物页面 → 点击📷 重新上传头像
+      </p>
+    </div>
+  </div>
+
+  <script>
+    const DB_NAME = 'classroom-pet-system';
+    const DB_VERSION = 1;
+
+    // 打开 IndexedDB
+    function openDB() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, DB_VERSION);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject('无法打开数据库，请确保在正确的域名下访问此工具');
+      });
+    }
+
+    // 读取所有学生
+    async function getStudents() {
+      const db = await openDB();
+      return new Promise((resolve) => {
+        const tx = db.transaction('students', 'readonly');
+        const req = tx.objectStore('students').getAll();
+        req.onsuccess = () => resolve(req.result || []);
+        req.onerror = () => resolve([]);
+      });
+    }
+
+    // 将头像写回对应学生
+    async function saveStudentsWithAvatars(updatedStudents) {
+      const db = await openDB();
+      return new Promise((resolve) => {
+        const tx = db.transaction('students', 'readwrite');
+        const store = tx.objectStore('students');
+        updatedStudents.forEach(s => store.put(s));
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => resolve(false);
+      });
+    }
+
+    // 加载当前状态
+    async function loadStats() {
+      try {
+        const students = await getStudents();
+        const total = students.length;
+        const withAvatar = students.filter(s => s.avatar || s.petImage).length;
+        const withoutAvatar = total - withAvatar;
+
+        const statsEl = document.getElementById('stats-area');
+        statsEl.innerHTML = `
+          <div class="stat-grid">
+            <div class="stat-box">
+              <div class="num">${total}</div>
+              <div class="label">学生总数</div>
+            </div>
+            <div class="stat-box" style="background:${withAvatar > 0 ? '#E8F5E9' : '#F5F5F5'};">
+              <div class="num" style="color:${withAvatar > 0 ? '#2E7D32' : '#999'};">${withAvatar}</div>
+              <div class="label">有头像</div>
+            </div>
+            <div class="stat-box" style="background:${withoutAvatar > 0 ? '#FFF3E0' : '#F5F5F5'};">
+              <div class="num" style="color:${withoutAvatar > 0 ? '#E65100' : '#999'};">${withoutAvatar}</div>
+              <div class="label">无头像</div>
+            </div>
+          </div>
+          ${withAvatar === 0 ? '<p style="color:#999;font-size:13px;">当前环境没有头像数据。如需导出，请在有头像的旧环境打开此工具。</p>' : ''}
+        `;
+
+        // 预览头像
+        const previewEl = document.getElementById('preview-area');
+        if (withAvatar > 0) {
+          previewEl.innerHTML = '<p style="font-size:12px;color:#999;width:100%;margin-bottom:6px;">头像预览：</p>';
+          students.slice(0, 20).forEach(s => {
+            const chip = document.createElement('div');
+            chip.className = `student-chip ${(s.avatar || s.petImage) ? 'has-avatar' : ''}`;
+            if (s.avatar) {
+              chip.innerHTML = `<img src="${s.avatar}" class="avatar-preview" alt="${s.name}"><span>${s.name}</span>`;
+            } else {
+              const emoji = s.petEmoji || '🐱';
+              chip.innerHTML = `<div class="avatar-placeholder">${emoji}</div><span>${s.name}</span>`;
+            }
+            previewEl.appendChild(chip);
+          });
+        }
+
+        // 如果没学生，显示提示
+        if (total === 0) {
+          statsEl.innerHTML = `
+            <div style="color:#C62828;font-size:13px;padding:10px;background:#FFEBEE;border-radius:8px;">
+              ⚠️ 未找到学生数据。请确保：<br>
+              1. 本工具和主系统在同一个域名（路径）下访问<br>
+              2. 主系统已正常初始化并有学生数据<br>
+              3. 浏览器未禁用 IndexedDB
+            </div>
+          `;
+        }
+
+        // 按钮状态
+        document.getElementById('export-btn').disabled = withAvatar === 0;
+      } catch (e) {
+        document.getElementById('stats-area').innerHTML = `
+          <div style="color:#C62828;font-size:13px;padding:10px;background:#FFEBEE;border-radius:8px;">
+            ❌ 读取数据失败：${e}<br>
+            请确保此工具与主系统在相同域名下访问。
+          </div>
+        `;
+      }
+    }
+
+    // 导出头像
+    async function exportAvatars() {
+      const btn = document.getElementById('export-btn');
+      btn.disabled = true;
+      btn.textContent = '导出中...';
+      const resultEl = document.getElementById('export-result');
+      resultEl.style.display = 'none';
+
+      try {
+        const students = await getStudents();
+        const avatarMap = {};
+        let count = 0;
+
+        students.forEach(s => {
+          if (s.avatar || s.petImage) {
+            avatarMap[s.id] = { name: s.name };
+            if (s.avatar)    { avatarMap[s.id].avatar    = s.avatar; }
+            if (s.petImage)  { avatarMap[s.id].petImage  = s.petImage; }
+            count++;
+          }
+        });
+
+        if (count === 0) {
+          resultEl.className = 'result-box error';
+          resultEl.textContent = '❌ 当前环境没有头像数据，无法导出';
+          resultEl.style.display = 'block';
+          return;
+        }
+
+        const payload = {
+          version: 1,
+          exportedAt: new Date().toISOString(),
+          source: window.location.hostname || 'local',
+          count,
+          avatars: avatarMap,
+        };
+
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `avatars-backup-${new Date().toISOString().slice(0,10)}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+
+        resultEl.className = 'result-box success';
+        resultEl.innerHTML = `✅ 导出成功！<br>已导出 <strong>${count}</strong> 个学生头像，文件已自动下载。<br><small>请将此文件保存好，在新环境使用"导入恢复"功能恢复头像。</small>`;
+        resultEl.style.display = 'block';
+      } catch (e) {
+        resultEl.className = 'result-box error';
+        resultEl.textContent = '❌ 导出失败：' + e;
+        resultEl.style.display = 'block';
+      }
+
+      btn.disabled = false;
+      btn.textContent = '📦 导出头像备份文件';
+      loadStats();
+    }
+
+    // 导入头像
+    async function importAvatars(input) {
+      const file = input.files[0];
+      if (!file) return;
+
+      const btn = document.getElementById('import-btn');
+      btn.disabled = true;
+      btn.textContent = '导入中...';
+      const resultEl = document.getElementById('import-result');
+      resultEl.style.display = 'none';
+
+      try {
+        const text = await file.text();
+        const payload = JSON.parse(text);
+
+        if (!payload.avatars || typeof payload.avatars !== 'object') {
+          throw new Error('文件格式错误，请选择正确的头像备份文件（avatars-backup-*.json）');
+        }
+
+        const avatarMap = payload.avatars;
+        const students = await getStudents();
+
+        if (students.length === 0) {
+          throw new Error('本地没有学生数据，请先通过"导入 JSON"功能恢复完整数据后再操作');
+        }
+
+        let restored = 0;
+        let notFound = [];
+        const updatedStudents = [];
+
+        students.forEach(s => {
+          const avatarData = avatarMap[s.id] || avatarMap[String(s.id)];
+          if (avatarData) {
+            const updated = { ...s };
+            if (avatarData.avatar)    updated.avatar   = avatarData.avatar;
+            if (avatarData.petImage)  updated.petImage  = avatarData.petImage;
+            updatedStudents.push(updated);
+            restored++;
+          } else {
+            updatedStudents.push(s);
+          }
+        });
+
+        // 检查备份中有但本地找不到的学生
+        Object.keys(avatarMap).forEach(id => {
+          const s = students.find(s => String(s.id) === String(id));
+          if (!s) notFound.push(avatarMap[id].name || id);
+        });
+
+        await saveStudentsWithAvatars(updatedStudents);
+
+        let msg = `✅ 恢复成功！已为 <strong>${restored}</strong>/${students.length} 个学生恢复头像。`;
+        if (notFound.length > 0) {
+          msg += `<br><small>以下学生在备份中存在但本地未找到：${notFound.slice(0,5).join('、')}${notFound.length > 5 ? '等' : ''}</small>`;
+        }
+        msg += '<br><small>刷新主系统页面即可看到头像。</small>';
+
+        resultEl.className = 'result-box success';
+        resultEl.innerHTML = msg;
+        resultEl.style.display = 'block';
+        loadStats();
+      } catch (e) {
+        resultEl.className = 'result-box error';
+        resultEl.textContent = '❌ 导入失败：' + (e.message || e);
+        resultEl.style.display = 'block';
+      }
+
+      btn.disabled = false;
+      btn.textContent = '🔄 选择头像备份文件并恢复';
+      input.value = '';
+    }
+
+    // 页面加载时读取状态
+    loadStats();
+  </script>
+</body>
+</html>
