@@ -123,16 +123,16 @@ function getMoodReason(moodKey) {
 
 // 背包道具（金币购买）
 const ITEMS = [
-  { id: 'apple',     name: '苹果',     emoji: '🍎', type: 'food',   effect: { hungry: 20, happy: 5  }, cost: 5,  desc: '补充饱食度+20' },
-  { id: 'cake',      name: '蛋糕',     emoji: '🎂', type: 'food',   effect: { hungry: 50, happy: 15 }, cost: 15, desc: '美味蛋糕，大幅补充饱食度' },
-  { id: 'milk',      name: '牛奶',     emoji: '🥛', type: 'food',   effect: { hungry: 30, health: 10 }, cost: 8,  desc: '增强体质+10' },
-  { id: 'fish',      name: '小鱼',     emoji: '🐟', type: 'food',   effect: { hungry: 40, happy: 20 }, cost: 12, desc: '宠物最爱的食物！' },
-  { id: 'soap',      name: '沐浴露',   emoji: '🧴', type: 'clean',  effect: { clean: 30 },             cost: 5,  desc: '清洁度+30' },
-  { id: 'shampoo',   name: '香波',     emoji: '🫧', type: 'clean',  effect: { clean: 50, happy: 10 }, cost: 10, desc: '让宠物香喷喷的！' },
-  { id: 'ball',      name: '皮球',     emoji: '⚽', type: 'toy',    effect: { happy: 25 },             cost: 8,  desc: '趣味玩耍，心情+25' },
-  { id: 'yarn',      name: '毛线团',   emoji: '🧶', type: 'toy',    effect: { happy: 35, hungry: -5 }, cost: 10, desc: '超级好玩的玩具！' },
-  { id: 'medicine',  name: '急救药',   emoji: '💊', type: 'heal',   effect: { health: 30 },            cost: 10, desc: '恢复健康度+30' },
-  { id: 'potion',    name: '魔法药水', emoji: '🧪', type: 'heal',   effect: { health: 60, happy: 10 }, cost: 25, desc: '快速恢复所有状态' },
+  { id: 'apple',     name: '苹果',     emoji: '🍎', type: 'food',   effect: { hungry: 20, happy: 5,  exp: 10 }, cost: 5,  desc: '补充饱食度+20，经验+10' },
+  { id: 'cake',      name: '蛋糕',     emoji: '🎂', type: 'food',   effect: { hungry: 50, happy: 15, exp: 30 }, cost: 15, desc: '美味蛋糕，大幅补充饱食度，经验+30' },
+  { id: 'milk',      name: '牛奶',     emoji: '🥛', type: 'food',   effect: { hungry: 30, health: 10, exp: 15 }, cost: 8,  desc: '增强体质+10，经验+15' },
+  { id: 'fish',      name: '小鱼',     emoji: '🐟', type: 'food',   effect: { hungry: 40, happy: 20, exp: 25 }, cost: 12, desc: '宠物最爱的食物！经验+25' },
+  { id: 'soap',      name: '沐浴露',   emoji: '🧴', type: 'clean',  effect: { clean: 30, exp: 10 },             cost: 5,  desc: '清洁度+30，经验+10' },
+  { id: 'shampoo',   name: '香波',     emoji: '🫧', type: 'clean',  effect: { clean: 50, happy: 10, exp: 20 }, cost: 10, desc: '让宠物香喷喷的！经验+20' },
+  { id: 'ball',      name: '皮球',     emoji: '⚽', type: 'toy',    effect: { happy: 25, exp: 15 },             cost: 8,  desc: '趣味玩耍，心情+25，经验+15' },
+  { id: 'yarn',      name: '毛线团',   emoji: '🧶', type: 'toy',    effect: { happy: 35, hungry: -5, exp: 20 }, cost: 10, desc: '超级好玩的玩具！经验+20' },
+  { id: 'medicine',  name: '急救药',   emoji: '💊', type: 'heal',   effect: { health: 30, exp: 5 },            cost: 10, desc: '恢复健康度+30，经验+5' },
+  { id: 'potion',    name: '魔法药水', emoji: '🧪', type: 'heal',   effect: { health: 60, happy: 10, exp: 40 }, cost: 25, desc: '快速恢复所有状态，经验+40' },
 ];
 
 // 任务模板

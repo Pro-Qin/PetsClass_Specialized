@@ -33,6 +33,16 @@ const TeacherDashboard = {
   },
   methods: {
     getStudentPetEmoji,
+    // 获取学生头像（优先自定义头像/宠物图片，兜底 emoji）
+    getStudentAvatar(student) {
+      if (student.avatar && student.avatar.startsWith('data:')) {
+        return { type: 'image', value: student.avatar };
+      }
+      if (student.petImage) {
+        return { type: 'image', value: student.petImage };
+      }
+      return { type: 'emoji', value: getStudentPetEmoji(student) };
+    },
     openPointsDetail(student) {
       this.pointsStudent = student;
     },
@@ -77,7 +87,10 @@ const TeacherDashboard = {
                    :style="i===0?'background:#FFD700;color:white':i===1?'background:#C0C0C0;color:white':i===2?'background:#CD7F32;color:white':'background:#F5F5F5;color:#888'">
                 {{ i+1 }}
               </div>
-              <span style="font-size:22px;flex-shrink:0;">{{ getStudentPetEmoji(s) }}</span>
+              <div style="width:28px;height:28px;border-radius:50%;overflow:hidden;flex-shrink:0;background:#F8F0FF;display:flex;align-items:center;justify-content:center;">
+                <img v-if="getStudentAvatar(s).type==='image'" :src="getStudentAvatar(s).value" style="width:100%;height:100%;object-fit:cover;" />
+                <span v-else style="font-size:22px;">{{ getStudentAvatar(s).value }}</span>
+              </div>
               <div style="flex:1;font-weight:700;font-size:14px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ s.name }}</div>
               <div style="font-weight:800;color:var(--warning);flex-shrink:0;">⭐{{ s.points||0 }}</div>
               <span style="font-size:12px;color:var(--primary);opacity:0.6;flex-shrink:0;">›</span>
@@ -98,7 +111,10 @@ const TeacherDashboard = {
               <span style="font-size:18px;font-weight:800;color:#7C4DFF;">{{ classStats.avgPoints }}</span>
             </div>
             <div v-if="topStudent" style="display:flex;align-items:center;gap:10px;padding:10px;background:linear-gradient(135deg,#FFF8E1,#FFF3CD);border-radius:10px;">
-              <span style="font-size:28px;">{{ getStudentPetEmoji(topStudent) }}</span>
+              <div style="width:44px;height:44px;border-radius:50%;overflow:hidden;flex-shrink:0;background:#FFF8E1;display:flex;align-items:center;justify-content:center;">
+                <img v-if="getStudentAvatar(topStudent).type==='image'" :src="getStudentAvatar(topStudent).value" style="width:100%;height:100%;object-fit:cover;" />
+                <span v-else style="font-size:28px;">{{ getStudentAvatar(topStudent).value }}</span>
+              </div>
               <div>
                 <div style="font-size:12px;color:var(--text-light);">🏆 积分冠军</div>
                 <div style="font-size:14px;font-weight:800;color:#E65100;">{{ topStudent.name }} · ⭐{{ topStudent.points }}</div>
@@ -113,7 +129,10 @@ const TeacherDashboard = {
         <div class="modal-box" style="max-width:420px;max-height:80vh;display:flex;flex-direction:column;">
           <!-- 头部 -->
           <div style="background:linear-gradient(135deg,#FF9800,#FFB74D);border-radius:16px 16px 0 0;margin:-20px -20px 0;padding:20px;color:white;flex-shrink:0;">
-            <div style="font-size:32px;margin-bottom:4px;">{{ getStudentPetEmoji(pointsStudent) }}</div>
+            <div style="width:60px;height:60px;border-radius:50%;overflow:hidden;margin:0 auto 8px;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;border:3px solid rgba(255,255,255,0.5);">
+              <img v-if="getStudentAvatar(pointsStudent).type==='image'" :src="getStudentAvatar(pointsStudent).value" style="width:100%;height:100%;object-fit:cover;" />
+              <span v-else style="font-size:36px;">{{ getStudentAvatar(pointsStudent).value }}</span>
+            </div>
             <div style="font-size:18px;font-weight:800;">{{ pointsStudent.name }} 的积分记录</div>
             <div style="font-size:13px;opacity:0.9;margin-top:4px;">当前积分：⭐ {{ pointsStudent.points || 0 }}</div>
           </div>
@@ -172,23 +191,66 @@ const TeacherStudents = {
       newStudent: { name:'', username:'', class:'' },
       showConfirmDelete: false,
       deleteStudentId: null,
+      // 点击学生确认框
+      openStudentConfirm: null, // 正在确认的学生对象
+      // 自定义快捷积分
+      customQuickPoints: [],    // 自定义加分数组
+      showAddQuickModal: false, // 添加快捷积分弹窗
+      newQuickPoint: '',        // 新快捷积分输入值
+      // 自定义快捷扣分
+      customQuickDeducts: [],
+      showAddQuickDeductModal: false,
+      newQuickDeduct: '',
+      // 排序方式
+      sortKey: localStorage.getItem('studentSortKey') || 'name_asc',
     };
   },
   computed: {
+    sortOptions() {
+      return [
+        { key: 'name_asc',   label: '姓名 A→Z',  icon: '🔤' },
+        { key: 'name_desc',  label: '姓名 Z→A',  icon: '🔠' },
+        { key: 'points_asc', label: '积分 低→高', icon: '📈' },
+        { key: 'points_desc',label: '积分 高→低', icon: '🏆' },
+        { key: 'level_asc',  label: '等级 低→高', icon: '🐣' },
+        { key: 'level_desc', label: '等级 高→低', icon: '🐉' },
+      ];
+    },
     students() {
       void this._rev;  // 依赖追踪，_rev 变化时强制重算
       const q = this.searchText.toLowerCase();
-      return Store.state.students.filter(s =>
+      const filtered = Store.state.students.filter(s =>
         s.name.includes(q) || s.username.toLowerCase().includes(q) || (s.class||'').includes(q)
-      ).sort((a, b) => {
-        // 按姓氏（姓名首字）拼音排序
-        return a.name.charCodeAt(0) - b.name.charCodeAt(0);
-      }).map(s => ({
+      );
+      const key = this.sortKey;
+      const sorted = [...filtered].sort((a, b) => {
+        switch (key) {
+          case 'name_asc':  return a.name.localeCompare(b.name, 'zh-Hans-CN');
+          case 'name_desc': return b.name.localeCompare(a.name, 'zh-Hans-CN');
+          case 'points_asc':  return (a.points||0) - (b.points||0);
+          case 'points_desc': return (b.points||0) - (a.points||0);
+          case 'level_asc':  return (a.petStage||0) - (b.petStage||0);
+          case 'level_desc': return (b.petStage||0) - (a.petStage||0);
+          default: return a.name.localeCompare(b.name, 'zh-Hans-CN');
+        }
+      });
+      return sorted.map(s => ({
         ...s,
         petEmoji: getStudentPetEmoji(s),
+        studentAvatar: s.avatar || null,
+        petImage: s.petImage || null,
         levelInfo: getLevelInfo(s.petExp||0),
       }));
     },
+  },
+  async mounted() {
+    // 加载自定义快捷积分
+    this.customQuickPoints = await Store.getQuickPoints();
+    // 自定义扣分存本地
+    try {
+      const d = localStorage.getItem('customQuickDeducts');
+      if (d) this.customQuickDeducts = JSON.parse(d);
+    } catch (e) {}
   },
   methods: {
     async addStudent() {
@@ -211,6 +273,48 @@ const TeacherStudents = {
       this.grantPoints = 20;
       this.grantReason = '';
       this.showGrantModal = true;
+    },
+    // ---- 快捷加分管理 ----
+    async addQuickPoint() {
+      const val = parseInt(this.newQuickPoint);
+      if (!val || val <= 0 || val > 9999) {
+        this.$emit('toast', '请输入 1-9999 之间的正整数', 'warning'); return;
+      }
+      if (this.customQuickPoints.includes(val)) {
+        this.$emit('toast', '该数值已存在', 'warning'); return;
+      }
+      this.customQuickPoints = [...this.customQuickPoints, val].sort((a, b) => a - b);
+      this.newQuickPoint = '';
+      this.showAddQuickModal = false;
+      await Store.saveQuickPoints(this.customQuickPoints);
+      this.$emit('toast', `✅ 已添加快捷加分 +${val}`, 'success');
+    },
+    async removeQuickPoint(val) {
+      this.customQuickPoints = this.customQuickPoints.filter(v => v !== val);
+      await Store.saveQuickPoints(this.customQuickPoints);
+    },
+    // ---- 快捷扣分管理 ----
+    changeSort(key) {
+      this.sortKey = key;
+      localStorage.setItem('studentSortKey', key);
+    },
+    addQuickDeduct() {
+      const val = parseInt(this.newQuickDeduct);
+      if (!val || val <= 0 || val > 9999) {
+        this.$emit('toast', '请输入 1-9999 之间的正整数', 'warning'); return;
+      }
+      if (this.customQuickDeducts.includes(val)) {
+        this.$emit('toast', '该数值已存在', 'warning'); return;
+      }
+      this.customQuickDeducts = [...this.customQuickDeducts, val].sort((a, b) => a - b);
+      this.newQuickDeduct = '';
+      this.showAddQuickDeductModal = false;
+      localStorage.setItem('customQuickDeducts', JSON.stringify(this.customQuickDeducts));
+      this.$emit('toast', `✅ 已添加快捷扣分 -${val}`, 'success');
+    },
+    removeQuickDeduct(val) {
+      this.customQuickDeducts = this.customQuickDeducts.filter(v => v !== val);
+      localStorage.setItem('customQuickDeducts', JSON.stringify(this.customQuickDeducts));
     },
     async doGrant() {
       if (!this.grantPoints || this.grantPoints <= 0) {
@@ -251,6 +355,19 @@ const TeacherStudents = {
     confirmDelete(id) {
       this.deleteStudentId = id;
       this.showConfirmDelete = true;
+    },
+    // 点击学生卡片 → 显示确认框
+    clickStudentCard(student) {
+      if (this.openStudentConfirm && this.openStudentConfirm.id === student.id) {
+        this.openStudentConfirm = null; // 再次点击同一学生关闭
+      } else {
+        this.openStudentConfirm = student;
+      }
+    },
+    // 以该学生身份打开学生系统（本页切换，不新开标签页）
+    openStudentSystem(student) {
+      this.openStudentConfirm = null;
+      this.$emit('view-as-student', student);
     },
     async doDelete() {
       const result = await Store.deleteStudent(this.deleteStudentId);
@@ -343,17 +460,32 @@ const TeacherStudents = {
       </div>
 
       <!-- 搜索 -->
-      <div style="position:relative;margin-bottom:16px;">
+      <div style="position:relative;margin-bottom:12px;">
         <input class="input-field" v-model="searchText" placeholder="🔍 搜索姓名/账号/班级..." style="padding-left:40px;" />
         <span style="position:absolute;left:14px;top:12px;font-size:16px;">🔍</span>
       </div>
 
+      <!-- 排序选择器 -->
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;">
+        <button v-for="opt in sortOptions" :key="opt.key" class="btn btn-sm"
+                :class="sortKey===opt.key?'btn-primary':'btn-ghost'"
+                @click="changeSort(opt.key)" style="font-size:12px;padding:4px 10px;">
+          {{ opt.icon }} {{ opt.label }}
+        </button>
+      </div>
+
       <!-- 学生卡片列表（响应式多栏网格） -->
       <div class="teacher-student-grid">
-        <div v-for="s in students" :key="s.id" class="card" style="padding:14px 16px;">
-          <!-- 头像+姓名+积分 -->
-          <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
-            <span style="font-size:36px;flex-shrink:0;">{{ s.petEmoji }}</span>
+        <div v-for="s in students" :key="s.id" class="card" style="padding:14px 16px;position:relative;">
+          <!-- 头像+姓名+积分（点击区域） -->
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;cursor:pointer;"
+               @click.stop="clickStudentCard(s)">
+            <!-- 圆形头像，优先显示自定义头像/宠物图片，兜底显示 emoji -->
+            <div style="width:50px;height:50px;border-radius:50%;overflow:hidden;flex-shrink:0;background:#F8F0FF;display:flex;align-items:center;justify-content:center;">
+              <img v-if="s.studentAvatar && s.studentAvatar.startsWith('data:')" :src="s.studentAvatar" style="width:100%;height:100%;object-fit:cover;" />
+              <img v-else-if="s.petImage" :src="s.petImage" style="width:100%;height:100%;object-fit:cover;" />
+              <span v-else style="font-size:36px;">{{ s.petEmoji }}</span>
+            </div>
             <div style="flex:1;min-width:0;">
               <div style="font-size:15px;font-weight:800;">{{ s.name }}</div>
               <div style="font-size:12px;color:var(--text-light);">{{ s.class }} · {{ s.username }}</div>
@@ -365,13 +497,27 @@ const TeacherStudents = {
               <span v-else class="badge badge-warning" style="font-size:11px;">未领宠物</span>
             </div>
           </div>
+
+          <!-- 内联确认框（同级、不置顶、不模糊背景） -->
+          <div v-if="openStudentConfirm && openStudentConfirm.id === s.id"
+               style="background:#F8F0FF;border:1.5px solid var(--primary);border-radius:10px;padding:10px 14px;margin-bottom:10px;
+                      display:flex;align-items:center;justify-content:space-between;gap:10px;animation:fadeIn 0.15s ease;">
+            <div style="font-size:13px;color:var(--text-dark);font-weight:600;">
+              打开 <span style="color:var(--primary);">{{ s.name }}</span> 的学生系统？
+            </div>
+            <div style="display:flex;gap:6px;flex-shrink:0;">
+              <button class="btn btn-ghost btn-sm" style="padding:4px 10px;font-size:12px;" @click.stop="openStudentConfirm=null">否</button>
+              <button class="btn btn-primary btn-sm" style="padding:4px 10px;font-size:12px;" @click.stop="openStudentSystem(s)">是</button>
+            </div>
+          </div>
+
           <!-- 宠物名 + 操作按钮 -->
           <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
             <div style="font-size:12px;color:var(--text-mid);">🐾 {{ s.petName || '未领取宠物' }}</div>
             <div style="display:flex;gap:4px;flex-wrap:wrap;">
-              <button class="btn btn-warning btn-sm" @click="openGrant(s)">⭐</button>
-              <button class="btn btn-sm" style="background:#FF9800;color:white;border:none;" @click="openDeduct(s)">⬇️</button>
-              <button class="btn btn-danger btn-sm" @click="confirmDelete(s.id)">🗑️</button>
+              <button class="btn btn-warning btn-sm" @click.stop="openGrant(s)">⭐</button>
+              <button class="btn btn-sm" style="background:#FF9800;color:white;border:none;" @click.stop="openDeduct(s)">⬇️</button>
+              <button class="btn btn-danger btn-sm" @click.stop="confirmDelete(s.id)">🗑️</button>
             </div>
           </div>
         </div>
@@ -402,7 +548,14 @@ const TeacherStudents = {
 
       <!-- 发分弹窗 -->
       <div v-if="showGrantModal && grantStudent" class="modal-overlay" @click.self="showGrantModal=false">
-        <div class="modal-box">
+        <!-- 背景滚动大字 -->
+        <div class="marquee-bg" :style="{'--marquee-duration': Math.max(6, 12 - grantStudent.name.length) + 's'}">
+          <div class="marquee-track">
+            <span class="marquee-text" v-for="i in 5" :key="'a'+i">{{ grantStudent.name }}</span>
+            <span class="marquee-text" v-for="i in 5" :key="'b'+i">{{ grantStudent.name }}</span>
+          </div>
+        </div>
+        <div class="modal-box" style="position:relative;z-index:2;">
           <h3 style="font-size:18px;font-weight:800;margin-bottom:6px;">⭐ 发放积分</h3>
           <p style="color:var(--text-light);font-size:13px;margin-bottom:16px;">给 {{ grantStudent.name }} 发放积分奖励</p>
           <div class="input-group">
@@ -413,9 +566,21 @@ const TeacherStudents = {
             <label>发放理由（可选）</label>
             <input class="input-field" v-model="grantReason" placeholder="例如：课堂表现优秀" />
           </div>
-          <!-- 快捷积分 -->
-          <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
-            <button v-for="pts in [10,20,30,50,100]" :key="pts" class="btn btn-ghost btn-sm" @click="grantPoints=pts">+{{ pts }}</button>
+          <!-- 快捷积分（默认 + 自定义） -->
+          <div style="margin-bottom:12px;">
+            <div style="font-size:12px;color:var(--text-light);margin-bottom:6px;">快捷加分</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+              <button v-for="pts in [10,20,30,50,100]" :key="'d'+pts" class="btn btn-ghost btn-sm" @click="grantPoints=pts">+{{ pts }}</button>
+              <button v-for="pts in customQuickPoints" :key="'c'+pts" class="btn btn-sm"
+                      style="background:#EDE7F6;color:#7C4DFF;border:1px solid #7C4DFF;position:relative;padding-right:22px;"
+                      @click="grantPoints=pts">
+                +{{ pts }}
+                <span style="position:absolute;right:4px;top:50%;transform:translateY(-50%);font-size:10px;color:#aaa;cursor:pointer;"
+                      @click.stop="removeQuickPoint(pts)" title="删除">✕</span>
+              </button>
+              <button class="btn btn-ghost btn-sm" style="color:#7C4DFF;border-color:#7C4DFF;font-weight:700;"
+                      @click="showAddQuickModal=true" title="添加常用加分数目">＋添加</button>
+            </div>
           </div>
           <div style="display:flex;gap:10px;">
             <button class="btn btn-ghost" style="flex:1" @click="showGrantModal=false">取消</button>
@@ -426,7 +591,14 @@ const TeacherStudents = {
 
       <!-- 扣分弹窗 -->
       <div v-if="showDeductModal && deductStudent" class="modal-overlay" @click.self="showDeductModal=false">
-        <div class="modal-box">
+        <!-- 背景滚动大字 -->
+        <div class="marquee-bg" :style="{'--marquee-duration': Math.max(6, 12 - deductStudent.name.length) + 's'}">
+          <div class="marquee-track">
+            <span class="marquee-text" v-for="i in 5" :key="'a'+i">{{ deductStudent.name }}</span>
+            <span class="marquee-text" v-for="i in 5" :key="'b'+i">{{ deductStudent.name }}</span>
+          </div>
+        </div>
+        <div class="modal-box" style="position:relative;z-index:2;">
           <h3 style="font-size:18px;font-weight:800;margin-bottom:6px;color:#FF9800;">⬇️ 扣除积分</h3>
           <p style="color:var(--text-light);font-size:13px;margin-bottom:16px;">
             对 <strong>{{ deductStudent.name }}</strong> 扣除积分（当前：⭐{{ deductStudent.points||0 }}）
@@ -439,10 +611,22 @@ const TeacherStudents = {
             <label>扣分原因（将通知学生）</label>
             <input class="input-field" v-model="deductReason" placeholder="例如：课堂违纪、作业未完成" />
           </div>
-          <!-- 快捷扣分 -->
-          <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
-            <button v-for="pts in [5,10,20,30,50]" :key="pts" class="btn btn-ghost btn-sm" @click="deductPoints=pts"
-                    style="color:#FF9800;border-color:#FF9800;">-{{ pts }}</button>
+          <!-- 快捷扣分（默认 + 自定义） -->
+          <div style="margin-bottom:16px;">
+            <div style="font-size:12px;color:var(--text-light);margin-bottom:6px;">快捷扣分</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+              <button v-for="pts in [5,10,20,30,50]" :key="'d'+pts" class="btn btn-ghost btn-sm"
+                      style="color:#FF9800;border-color:#FF9800;" @click="deductPoints=pts">-{{ pts }}</button>
+              <button v-for="pts in customQuickDeducts" :key="'c'+pts" class="btn btn-sm"
+                      style="background:#FFF3E0;color:#FF9800;border:1px solid #FF9800;position:relative;padding-right:22px;"
+                      @click="deductPoints=pts">
+                -{{ pts }}
+                <span style="position:absolute;right:4px;top:50%;transform:translateY(-50%);font-size:10px;color:#aaa;cursor:pointer;"
+                      @click.stop="removeQuickDeduct(pts)" title="删除">✕</span>
+              </button>
+              <button class="btn btn-ghost btn-sm" style="color:#FF9800;border-color:#FF9800;font-weight:700;"
+                      @click="showAddQuickDeductModal=true" title="添加常用扣分数目">＋添加</button>
+            </div>
           </div>
           <div style="display:flex;gap:10px;">
             <button class="btn btn-ghost" style="flex:1" @click="showDeductModal=false">取消</button>
@@ -465,6 +649,38 @@ const TeacherStudents = {
           </div>
         </div>
       </div>
+
+      <!-- 添加快捷加分弹窗 -->
+      <div v-if="showAddQuickModal" class="modal-overlay" @click.self="showAddQuickModal=false">
+        <div class="modal-box" style="max-width:320px;">
+          <h3 style="font-size:16px;font-weight:800;margin-bottom:14px;">⭐ 添加常用加分数目</h3>
+          <div class="input-group">
+            <label>加分数值（1-9999）</label>
+            <input class="input-field" type="number" v-model="newQuickPoint" min="1" max="9999"
+                   placeholder="例如：15" @keyup.enter="addQuickPoint" autofocus />
+          </div>
+          <div style="display:flex;gap:8px;margin-top:4px;">
+            <button class="btn btn-ghost" style="flex:1" @click="showAddQuickModal=false;newQuickPoint=''">取消</button>
+            <button class="btn btn-primary" style="flex:2" @click="addQuickPoint">✅ 添加</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 添加快捷扣分弹窗 -->
+      <div v-if="showAddQuickDeductModal" class="modal-overlay" @click.self="showAddQuickDeductModal=false">
+        <div class="modal-box" style="max-width:320px;">
+          <h3 style="font-size:16px;font-weight:800;margin-bottom:14px;color:#FF9800;">⬇️ 添加常用扣分数目</h3>
+          <div class="input-group">
+            <label>扣分数值（1-9999）</label>
+            <input class="input-field" type="number" v-model="newQuickDeduct" min="1" max="9999"
+                   placeholder="例如：15" @keyup.enter="addQuickDeduct" autofocus />
+          </div>
+          <div style="display:flex;gap:8px;margin-top:4px;">
+            <button class="btn btn-ghost" style="flex:1" @click="showAddQuickDeductModal=false;newQuickDeduct=''">取消</button>
+            <button class="btn btn-danger" style="flex:2;background:#FF9800;border-color:#FF9800;" @click="addQuickDeduct">✅ 添加</button>
+          </div>
+        </div>
+      </div>
     </div>
   `
 };
@@ -480,6 +696,8 @@ const TeacherRank = {
           ...s,
           rank: i + 1,
           petEmoji: getStudentPetEmoji(s),
+          studentAvatar: s.avatar || null,  // 自定义头像
+          petImage: s.petImage || null,     // 宠物图片
           levelInfo: getLevelInfo(s.petExp||0),
           mood: getStudentMood(s.petStatus),
         }));
@@ -496,8 +714,12 @@ const TeacherRank = {
                  :style="s.rank===1?'background:#FFD700;color:white':s.rank===2?'background:#C0C0C0;color:white':s.rank===3?'background:#CD7F32;color:white':'background:#F5F5F5;color:#666'">
               {{ s.rank <= 3 ? ['👑','🥈','🥉'][s.rank-1] : s.rank }}
             </div>
-            <!-- 宠物头像 -->
-            <span style="font-size:34px;flex-shrink:0;">{{ s.petEmoji }}</span>
+            <!-- 宠物头像（圆形） -->
+            <div style="width:44px;height:44px;border-radius:50%;overflow:hidden;flex-shrink:0;background:#F8F0FF;display:flex;align-items:center;justify-content:center;">
+              <img v-if="s.studentAvatar && s.studentAvatar.startsWith('data:')" :src="s.studentAvatar" style="width:100%;height:100%;object-fit:cover;" />
+              <img v-else-if="s.petImage" :src="s.petImage" style="width:100%;height:100%;object-fit:cover;" />
+              <span v-else style="font-size:30px;">{{ s.petEmoji }}</span>
+            </div>
             <!-- 信息区 -->
             <div style="flex:1;min-width:0;">
               <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
@@ -824,12 +1046,6 @@ const TeacherAnalytics = {
                   <td style="padding:12px;text-align:center;">Lv.{{ student.petLevel }}</td>
                 </tr>
               </tbody>
-                      </div>
-                      <span style="font-weight:700;">{{ student.completionRate }}%</span>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
             </table>
           </div>
         </div>
@@ -938,30 +1154,39 @@ const TeacherSettings = {
         expMultiplier: 0.5, // 积分转经验倍率
         dailyExpLimit: 50,  // 每日经验上限
         growthStages: [
-          { level: 0, name: '蛋', minExp: 0, maxExp: 100 },
-          { level: 1, name: '小幼宠', minExp: 100, maxExp: 300 },
-          { level: 2, name: '幼宠', minExp: 300, maxExp: 600 },
-          { level: 3, name: '活泼期', minExp: 600, maxExp: 1000 },
-          { level: 4, name: '成长期', minExp: 1000, maxExp: 1500 },
-          { level: 5, name: '少年宠', minExp: 1500, maxExp: 2200 },
-          { level: 6, name: '青春期', minExp: 2200, maxExp: 3100 },
-          { level: 7, name: '亚成体', minExp: 3100, maxExp: 4200 },
-          { level: 8, name: '成长宠', minExp: 4200, maxExp: 5600 },
-          { level: 9, name: '壮年宠', minExp: 5600, maxExp: 7200 },
-          { level: 10, name: '熟练宠', minExp: 7200, maxExp: 9000 },
-          { level: 11, name: '精英宠', minExp: 9000, maxExp: 11200 },
-          { level: 12, name: '强化宠', minExp: 11200, maxExp: 13700 },
-          { level: 13, name: '进化宠', minExp: 13700, maxExp: 16500 },
-          { level: 14, name: '超进化', minExp: 16500, maxExp: 20000 },
-          { level: 15, name: '稀有宠', minExp: 20000, maxExp: 24000 },
-          { level: 16, name: '史诗宠', minExp: 24000, maxExp: 28500 },
-          { level: 17, name: '传奇宠', minExp: 28500, maxExp: 33500 },
-          { level: 18, name: '神话宠', minExp: 33500, maxExp: 39000 },
-          { level: 19, name: '✨传说✨', minExp: 39000, maxExp: 45000 },
-          { level: 20, name: '巅峰宠', minExp: 45000, maxExp: 99999 },
+          { level:  0, name: '小幼宠',  minExp: 0,     maxExp: 100   },
+          { level:  1, name: '幼宠',    minExp: 100,   maxExp: 300   },
+          { level:  2, name: '活泼期',  minExp: 300,   maxExp: 600   },
+          { level:  3, name: '成长期',  minExp: 600,   maxExp: 1000  },
+          { level:  4, name: '少年宠',  minExp: 1000,  maxExp: 1500  },
+          { level:  5, name: '青春期',  minExp: 1500,  maxExp: 2200  },
+          { level:  6, name: '亚成体',  minExp: 2200,  maxExp: 3100  },
+          { level:  7, name: '成长宠',  minExp: 3100,  maxExp: 4200  },
+          { level:  8, name: '壮年宠',  minExp: 4200,  maxExp: 5600  },
+          { level:  9, name: '熟练宠',  minExp: 5600,  maxExp: 7200  },
+          { level: 10, name: '精英宠',  minExp: 7200,  maxExp: 9000  },
+          { level: 11, name: '强化宠',  minExp: 9000,  maxExp: 11200 },
+          { level: 12, name: '进化宠',  minExp: 11200, maxExp: 13700 },
+          { level: 13, name: '超进化',  minExp: 13700, maxExp: 16500 },
+          { level: 14, name: '稀有宠',  minExp: 16500, maxExp: 20000 },
+          { level: 15, name: '史诗宠',  minExp: 20000, maxExp: 24000 },
+          { level: 16, name: '传奇宠',  minExp: 24000, maxExp: 28500 },
+          { level: 17, name: '神话宠',  minExp: 28500, maxExp: 33500 },
+          { level: 18, name: '✨传说✨', minExp: 33500, maxExp: 39000 },
+          { level: 19, name: '巅峰宠',  minExp: 39000, maxExp: 99999 },
         ],
       },
       showSaveConfirm: false,
+      // 宠物经验控制面板
+      petExpControl: {
+        baseExp: 50,          // 基础经验值
+        topMultiplier: 2.0,   // 第1名加成倍率
+        bottomMultiplier: 0.5, // 末名加成倍率
+        moodLink: true,       // 心情联动开关
+      },
+      expPreview: [],         // 预览结果
+      showExpPreview: false,  // 是否显示预览
+      granting: false,        // 发放中
     };
   },
   created() {
@@ -1012,6 +1237,45 @@ const TeacherSettings = {
     confirmSave() {
       if (this.validateRules()) {
         this.showSaveConfirm = true;
+      }
+    },
+    // ---- 宠物经验控制面板 ----
+    previewExpGrant() {
+      const students = (Store.state.students || []).filter(s => !s.petDead);
+      if (students.length === 0) {
+        this.$emit('toast', '没有可发放经验的学生', 'warning');
+        return;
+      }
+      const { baseExp, topMultiplier, bottomMultiplier } = this.petExpControl;
+      const ranked = [...students].sort((a, b) => (b.points || 0) - (a.points || 0));
+      const total = ranked.length;
+      this.expPreview = ranked.map((s, i) => {
+        const ratio = total === 1 ? topMultiplier :
+          bottomMultiplier + (topMultiplier - bottomMultiplier) * ((total - 1 - i) / (total - 1));
+        const exp = Math.round(baseExp * ratio);
+        return {
+          id: s.id,
+          name: s.name,
+          points: s.points || 0,
+          rank: i + 1,
+          ratio: ratio.toFixed(2),
+          exp,
+          currentExp: s.petExp || 0,
+        };
+      });
+      this.showExpPreview = true;
+    },
+    async doGrantExp() {
+      if (this.granting) return;
+      this.granting = true;
+      const result = await Store.batchGrantPetExp(this.petExpControl);
+      this.granting = false;
+      if (result.success) {
+        this.$emit('toast', `✅ 已为 ${result.total} 名学生发放宠物经验`, 'success');
+        this.showExpPreview = false;
+        this.expPreview = [];
+      } else {
+        this.$emit('toast', result.msg || '发放失败', 'error');
       }
     },
     doExportJSON() {
@@ -1107,37 +1371,107 @@ const TeacherSettings = {
         <div class="card" style="padding:20px;margin-bottom:20px;">
           <h3 style="font-size:16px;font-weight:800;margin-bottom:16px;">🐾 宠物成长规则配置</h3>
           <p style="font-size:13px;color:var(--text-light);margin-bottom:20px;">调整宠物成长速度、等级提升条件等参数</p>
-          
+
           <div style="display:flex;flex-direction:column;gap:14px;margin-bottom:24px;">
             <div class="input-group">
               <label>💫 积分转经验倍率</label>
               <input class="input-field" type="number" v-model.number="growthRules.expMultiplier" min="0" max="2" step="0.1" />
               <span style="font-size:12px;color:var(--text-light);">倍</span>
             </div>
-            
+
             <div class="input-group">
               <label>📈 每日经验上限</label>
               <input class="input-field" type="number" v-model.number="growthRules.dailyExpLimit" min="0" max="200" />
               <span style="font-size:12px;color:var(--text-light);">点</span>
             </div>
           </div>
-          
+
           <div style="margin-bottom:16px;">
             <h4 style="font-size:14px;font-weight:800;margin-bottom:12px;">成长阶段设置</h4>
             <p style="font-size:12px;color:var(--text-light);margin-bottom:12px;">调整各等级所需经验值（注：高级别经验值必须大于低级别）</p>
-            
+
             <div style="max-height:300px;overflow-y:auto;">
               <div v-for="(stage, index) in growthRules.growthStages" :key="stage.level" style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">
-                <div style="width:80px;font-size:13px;font-weight:700;">{{ stage.name }}</div>
-                <div style="width:80px;">
-                  <input class="input-field" type="number" v-model.number="stage.minExp" min="0" style="width:100%;" />
+                <div style="width:70px;font-size:13px;font-weight:700;flex-shrink:0;">{{ stage.name }}</div>
+                <div style="width:90px;flex-shrink:0;">
+                  <input type="number" v-model.number="stage.minExp" min="0" style="width:100%;padding:8px 10px;border:2px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;outline:none;background:#FAFAFA;" />
                 </div>
-                <div style="width:20px;text-align:center;">~</div>
-                <div style="width:80px;">
-                  <input class="input-field" type="number" v-model.number="stage.maxExp" min="0" style="width:100%;" />
+                <div style="width:16px;text-align:center;flex-shrink:0;">~</div>
+                <div style="width:90px;flex-shrink:0;">
+                  <input type="number" v-model.number="stage.maxExp" min="0" style="width:100%;padding:8px 10px;border:2px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;outline:none;background:#FAFAFA;" />
                 </div>
                 <div style="font-size:12px;color:var(--text-light);">经验</div>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 宠物经验批量发放控制面板 -->
+        <div class="card" style="padding:20px;margin-bottom:20px;">
+          <h3 style="font-size:16px;font-weight:800;margin-bottom:16px;">🎯 宠物经验批量发放</h3>
+          <p style="font-size:13px;color:var(--text-light);margin-bottom:20px;">基于积分排名为学生宠物发放经验，积分排名越高获得经验越多，宠物心情也会相应变化</p>
+
+          <div style="display:flex;flex-direction:column;gap:14px;margin-bottom:20px;">
+            <div class="input-group">
+              <label>⭐ 基础经验值</label>
+              <input class="input-field" type="number" v-model.number="petExpControl.baseExp" min="1" max="500" />
+              <span style="font-size:12px;color:var(--text-light);">点</span>
+            </div>
+
+            <div class="input-group">
+              <label>🥇 第1名加成倍率</label>
+              <input class="input-field" type="number" v-model.number="petExpControl.topMultiplier" min="0.5" max="5" step="0.1" />
+              <span style="font-size:12px;color:var(--text-light);">倍</span>
+            </div>
+
+            <div class="input-group">
+              <label>🥉 末名加成倍率</label>
+              <input class="input-field" type="number" v-model.number="petExpControl.bottomMultiplier" min="0.1" max="3" step="0.1" />
+              <span style="font-size:12px;color:var(--text-light);">倍</span>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:10px;padding:8px 0;">
+              <label style="font-size:14px;font-weight:600;">🎭 心情联动</label>
+              <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer;">
+                <input type="checkbox" v-model="petExpControl.moodLink" style="opacity:0;width:0;height:0;" />
+                <span style="position:absolute;inset:0;background:var(--border);border-radius:24px;transition:0.3s;" :style="petExpControl.moodLink ? 'background:var(--primary)' : ''"></span>
+                <span style="position:absolute;left:3px;top:3px;width:18px;height:18px;background:#fff;border-radius:50%;transition:0.3s;" :style="petExpControl.moodLink ? 'transform:translateX(20px)' : ''"></span>
+              </label>
+              <span style="font-size:12px;color:var(--text-light);">积分排名影响宠物心情值（前30%↑ / 后30%↓）</span>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="btn btn-ghost" @click="previewExpGrant">👁️ 预览分配</button>
+            <button class="btn btn-primary" @click="doGrantExp" :disabled="granting">{{ granting ? '发放中...' : '🚀 一键发放' }}</button>
+          </div>
+
+          <!-- 经验分配预览 -->
+          <div v-if="showExpPreview && expPreview.length" style="margin-top:20px;">
+            <h4 style="font-size:14px;font-weight:800;margin-bottom:10px;">📊 经验分配预览</h4>
+            <div style="max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;">
+              <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                <thead>
+                  <tr style="background:var(--bg);position:sticky;top:0;">
+                    <th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--border);">排名</th>
+                    <th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--border);">姓名</th>
+                    <th style="padding:8px 10px;text-align:right;border-bottom:1px solid var(--border);">积分</th>
+                    <th style="padding:8px 10px;text-align:center;border-bottom:1px solid var(--border);">倍率</th>
+                    <th style="padding:8px 10px;text-align:right;border-bottom:1px solid var(--border);">获得经验</th>
+                    <th style="padding:8px 10px;text-align:right;border-bottom:1px solid var(--border);">当前经验</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="item in expPreview" :key="item.id" style="border-bottom:1px solid var(--border);">
+                    <td style="padding:6px 10px;">{{ item.rank <= 3 ? ['🥇','🥈','🥉'][item.rank-1] : item.rank }}</td>
+                    <td style="padding:6px 10px;font-weight:600;">{{ item.name }}</td>
+                    <td style="padding:6px 10px;text-align:right;">{{ item.points }}</td>
+                    <td style="padding:6px 10px;text-align:center;">×{{ item.ratio }}</td>
+                    <td style="padding:6px 10px;text-align:right;color:var(--success);font-weight:700;">+{{ item.exp }}</td>
+                    <td style="padding:6px 10px;text-align:right;color:var(--text-light);">{{ item.currentExp }}</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -1211,7 +1545,7 @@ const TeacherSettings = {
 const TeacherApp = {
   name: 'TeacherApp',
   props: ['user'],
-  emits: ['logout'],
+  emits: ['logout', 'view-as-student'],
   data() {
     return {
       currentSection: 'dashboard',
@@ -1238,6 +1572,9 @@ const TeacherApp = {
     this.$_pollTimer = setInterval(async () => {
       await Store.refreshStudents();
     }, 10000);
+
+    // 每日自动发放宠物经验（基于积分排名，每天一次）
+    this._autoDailyExpGrant();
   },
   beforeUnmount() {
     if (this.$_pollTimer) clearInterval(this.$_pollTimer);
@@ -1250,6 +1587,36 @@ const TeacherApp = {
       this.$emit('logout');
     },
     navTo(key) { this.currentSection = key; this.showAvatarMenu = false; },
+
+    // 每日自动发放宠物经验（基于积分排名，一天一次，日期存云端）
+    async _autoDailyExpGrant() {
+      try {
+        const today = new Date().toLocaleDateString('zh-CN');
+        const lastDate = await Store.getDailyGrantDate();
+        if (lastDate === today) return; // 今天已发放过
+
+        // 确保学生数据已初始化
+        if (Store.state.students.length === 0) return;
+
+        const result = await Store.batchGrantPetExp({
+          baseExp: 50,
+          topMultiplier: 2.0,
+          bottomMultiplier: 0.5,
+          moodLink: true,
+        });
+
+        if (result.success && result.results) {
+          await Store.setDailyGrantDate(today);
+          const levelUps = result.results.filter(r => r.levelUp).length;
+          let msg = `🐾 每日经验已自动发放！${result.results.length} 位学生`;
+          if (levelUps > 0) msg += `，${levelUps} 只宠物升级了 🎉`;
+          Store.toast(msg, 'success');
+          console.log('[TeacherApp] 每日自动经验发放完成，升级数:', levelUps);
+        }
+      } catch (e) {
+        console.warn('[TeacherApp] 每日自动经验发放失败:', e.message);
+      }
+    },
   },
   template: `
     <div style="min-height:100vh;background:#F8F0FF;" @click="showAvatarMenu=false">
@@ -1291,7 +1658,7 @@ const TeacherApp = {
       <!-- 主内容 -->
       <div class="main-content">
         <teacher-dashboard v-if="currentSection==='dashboard'" :teacher="user" @toast="onToast"></teacher-dashboard>
-        <teacher-students  v-if="currentSection==='students'"  @toast="onToast"></teacher-students>
+        <teacher-students  v-if="currentSection==='students'"  @toast="onToast" @view-as-student="s => $emit('view-as-student', s)"></teacher-students>
         <teacher-analytics v-if="currentSection==='analytics'" @toast="onToast"></teacher-analytics>
         <teacher-rank      v-if="currentSection==='rank'"></teacher-rank>
         <teacher-settings  v-if="currentSection==='settings'"  :user="user" @toast="onToast"></teacher-settings>

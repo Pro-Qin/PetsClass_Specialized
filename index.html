@@ -7,20 +7,111 @@
   <link rel="stylesheet" href="styles/main.css">
   <link rel="stylesheet" href="styles/animations.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- 加载画面：在 #app 外部，不受 Vue 挂载影响，页面解析即可见 -->
+  <style>
+    #loading-splash {
+      position: fixed; inset: 0;
+      background: linear-gradient(135deg, #7C4DFF 0%, #FF6B9D 100%);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      z-index: 99999; transition: opacity 0.5s ease;
+    }
+    #loading-splash .splash-icon { font-size: 64px; animation: splashBounce 1.5s ease-in-out infinite; }
+    #loading-splash .splash-title { font-size: 22px; font-weight: 900; color: white; margin-top: 20px; letter-spacing: 2px; }
+    #loading-splash .splash-status { font-size: 14px; color: rgba(255,255,255,0.7); margin-top: 12px; min-height: 20px; }
+    #loading-splash .splash-bar-track { margin-top: 24px; width: 160px; height: 4px; background: rgba(255,255,255,0.2); border-radius: 4px; overflow: hidden; }
+    #loading-splash .splash-bar { height: 100%; background: white; border-radius: 4px; animation: splashSlide 1.5s ease-in-out infinite; }
+    @keyframes splashBounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-12px)} }
+    @keyframes splashSlide { 0%{width:10%;margin-left:0} 50%{width:50%;margin-left:25%} 100%{width:10%;margin-left:90%} }
+  </style>
 </head>
 <body>
+  <!-- 加载画面：独立于 Vue，确保页面打开立即显示 -->
+  <div id="loading-splash">
+    <div class="splash-icon">🐾</div>
+    <div class="splash-title">课堂电子宠物系统</div>
+    <div id="loading-status" class="splash-status">正在加载资源...</div>
+    <div class="splash-bar-track"><div id="loading-bar" class="splash-bar"></div></div>
+  </div>
+
   <div id="app"></div>
-  <script src="js/data.js"></script>
-  <script src="js/supabase.js"></script>
-  <script src="js/store.js"></script>
-  <script src="js/pet_import.js"></script>
-  <script src="js/components/login.js"></script>
-  <script src="js/components/student.js"></script>
-  <script src="js/components/teacher.js"></script>
-  <script src="js/components/admin.js"></script>
-  <script src="js/app.js"></script>
+
+  <!-- CDN 脚本：async 不阻塞本地脚本；加载失败不影响本地功能 -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" async onerror="window.__supabaseLoadFailed=1"></script>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js" async onerror="window.__vueLoadFailed=1"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js" async onerror="window.__chartLoadFailed=1"></script>
+
+  <!-- 本地脚本加载器：等待 Vue 就绪后按序加载所有本地 JS -->
+  <script>
+  (function() {
+    var localScripts = [
+      'js/data.js',
+      'js/supabase.js',
+      'js/store.js',
+      'js/pet_import.js',
+      'js/components/login.js',
+      'js/components/student.js',
+      'js/components/teacher.js',
+      'js/components/admin.js',
+      'js/app.js',
+    ];
+
+    var statusEl = document.getElementById('loading-status');
+
+    // 轮询等待 Vue 就绪（async CDN 可能还没加载完）
+    function waitForVue() {
+      return new Promise(function(resolve) {
+        if (typeof Vue !== 'undefined') { resolve(); return; }
+        var waited = 0;
+        var timer = setInterval(function() {
+          waited += 100;
+          if (typeof Vue !== 'undefined') { clearInterval(timer); resolve(); }
+          else if (waited > 15000) {
+            clearInterval(timer);
+            // Vue 加载超时，显示错误，但仍 resolve 让流程继续
+            if (statusEl) statusEl.textContent = '❌ Vue 加载失败，请检查网络后刷新';
+            var splash = document.getElementById('loading-splash');
+            if (splash) {
+              splash.style.background = 'linear-gradient(135deg, #c62828, #ff5252)';
+            }
+            resolve();
+          }
+        }, 100);
+      });
+    }
+
+    // 按序加载本地脚本（async=false 保证执行顺序与插入顺序一致）
+    function loadScript(src) {
+      return new Promise(function(resolve, reject) {
+        var s = document.createElement('script');
+        s.src = src;
+        s.async = false;  // 关键：多个 async=false 的动态脚本按插入顺序执行
+        s.onload = resolve;
+        s.onerror = function() {
+          console.error('脚本加载失败:', src);
+          reject(new Error('加载失败: ' + src));
+        };
+        document.head.appendChild(s);
+      });
+    }
+
+    async function boot() {
+      if (statusEl) statusEl.textContent = '等待框架加载...';
+      await waitForVue();
+      if (statusEl) statusEl.textContent = '正在初始化应用...';
+
+      for (var i = 0; i < localScripts.length; i++) {
+        try {
+          await loadScript(localScripts[i]);
+        } catch(e) {
+          console.error('启动失败:', e);
+          if (statusEl) statusEl.textContent = '❌ 加载失败: ' + localScripts[i];
+          return;
+        }
+      }
+    }
+
+    boot();
+  })();
+  </script>
 </body>
 </html>

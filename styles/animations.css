@@ -252,6 +252,46 @@
 }
 
 /* 等级提升横幅 */
+/* 积分弹窗背景滚动大字 */
+@keyframes marqueeScroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.marquee-bg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+}
+.marquee-bg .marquee-track {
+  display: flex;
+  align-items: center;
+  animation: marqueeScroll var(--marquee-duration, 12s) linear infinite;
+}
+.marquee-bg .marquee-text {
+  font-size: 72px;
+  font-weight: 900;
+  padding: 0 60px;
+  color: #fff;
+  opacity: 0.5;
+  user-select: none;
+  flex-shrink: 0;
+  letter-spacing: 8px;
+  text-shadow: 0 0 20px rgba(255,255,255,0.1);
+}
+@media (min-width: 1024px) {
+  .marquee-bg .marquee-text {
+    font-size: 96px;
+    padding: 0 80px;
+    letter-spacing: 12px;
+    opacity: 0.5;
+  }
+}
+
 .level-up-banner {
   position: fixed;
   top: 50%;

@@ -6,7 +6,7 @@
 class IndexedDBStorage {
   constructor() {
     this.dbName = 'classroom-pet-system';
-    this.dbVersion = 1;
+    this.dbVersion = 2; // v2: 新增 meta ObjectStore（云端同步时间戳）
     this.db = null;
   }
 
@@ -37,7 +37,34 @@ class IndexedDBStorage {
         if (!db.objectStoreNames.contains('backups')) {
           db.createObjectStore('backups', { keyPath: 'id', autoIncrement: true });
         }
+        
+        // 创建元数据存储（记录同步时间戳）
+        if (!db.objectStoreNames.contains('meta')) {
+          db.createObjectStore('meta', { keyPath: 'key' });
+        }
       };
+    });
+  }
+
+  // ---- 元数据读写（云端同步时间戳）----
+  async getMeta(key) {
+    if (!this.db) await this.init();
+    return new Promise((resolve) => {
+      const transaction = this.db.transaction('meta', 'readonly');
+      const store = transaction.objectStore('meta');
+      const request = store.get(key);
+      request.onsuccess = () => resolve(request.result ? request.result.value : null);
+      request.onerror = () => resolve(null);
+    });
+  }
+
+  async storeMeta(key, value) {
+    if (!this.db) await this.init();
+    return new Promise((resolve) => {
+      const transaction = this.db.transaction('meta', 'readwrite');
+      const store = transaction.objectStore('meta');
+      store.put({ key, value, updatedAt: new Date().toISOString() });
+      transaction.oncomplete = () => resolve();
     });
   }
 

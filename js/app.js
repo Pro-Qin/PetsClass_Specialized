@@ -23,6 +23,8 @@ const App = {
       debugMode: false,    // Debug模式开关
       modePanelExpanded: false,  // 系统模式面板展开状态
       showUserSwitcher: false,  // 用户切换面板
+      appReady: false,    // Store 初始化完成后为 true
+      teacherPreview: null, // 教师预览模式：保存原始教师用户，非 null 表示正在以学生视角预览
     };
   },
   computed: {
@@ -72,17 +74,29 @@ const App = {
         name: user.name,
         username: user.username || user.name
       }));
-      
-      console.log('用户登录成功:', user);
     },
     
     // 退出登录
     logout() {
+      // 如果是教师预览学生模式，返回教师端而非退出
+      if (this.teacherPreview) {
+        this.currentUser = this.teacherPreview;
+        this.appMode = 'teacher';
+        this.teacherPreview = null;
+        return;
+      }
       this.isLoggedIn = false;
       this.currentUser = null;
       this.appMode = 'student';
       localStorage.removeItem('petSystemUser');
-      console.log('用户已退出');
+    },
+
+    // 教师/管理员以学生身份预览
+    viewAsStudent(student) {
+      this.teacherPreview = this.currentUser; // 保存当前教师身份
+      this.currentUser = { ...student, role: 'student' };
+      this.appMode = 'student';
+      this.isLoggedIn = true;
     },
     
     // 切换显示模式
@@ -182,14 +196,12 @@ const App = {
             user = { ...ADMIN_ACCOUNT };
           }
           
-          if (user) {
-            this.currentUser = { ...user, role: userData.role };
-            this.isLoggedIn = true;
-            this.appMode = userData.role;
-            console.log('已恢复登录状态:', this.currentUser);
-          }
+        if (user) {
+          this.currentUser = { ...user, role: userData.role };
+          this.isLoggedIn = true;
+          this.appMode = userData.role;
+        }
         } catch (e) {
-          console.warn('恢复登录状态失败:', e);
           localStorage.removeItem('petSystemUser');
         }
       }
@@ -197,32 +209,38 @@ const App = {
   },
   
   async mounted() {
-    // 等待 Store 从本地存储加载数据完成
+    const statusEl = document.getElementById('loading-status');
+    const barEl = document.getElementById('loading-bar');
+
+    // 阶段1：触发 Store 初始化（本地 IndexedDB 加载，极快；云端后台同步不阻塞）
+    if (statusEl) statusEl.textContent = '正在加载数据...';
+    Store.init();  // 本地数据先就绪，云端后台静默同步
+
+    // 阶段2：等待 Store 本地数据就绪（通常 < 500ms）
     let waited = 0;
-    while (!Store.state._initialized && waited < 8000) {
+    while (!Store.state._initialized && waited < 20000) {
+      if (waited > 1000 && statusEl) statusEl.textContent = '加载本地数据...';
+      if (waited > 5000 && statusEl) statusEl.textContent = '正在同步云端数据...';
+      if (waited > 15000 && statusEl) statusEl.textContent = '加载较慢，请稍候...';
       await new Promise(r => setTimeout(r, 100));
       waited += 100;
     }
 
-    // 不再自动恢复登录状态，每次打开均需重新登录
-    // 如果没有登录，且没有学生数据，自动进入教师端（首次使用场景）
-    if (!this.isLoggedIn && Store.state.students.length === 0) {
-      // 自动使用教师账号登录
-      const teacherAccount = TEACHER_ACCOUNTS[0];
-      if (teacherAccount) {
-        this.currentUser = { ...teacherAccount, role: 'teacher' };
-        this.isLoggedIn = true;
-        this.appMode = 'teacher';
-        console.log('首次加载无数据，自动进入教师端');
-      }
+    if (!Store.state._initialized && statusEl) {
+      statusEl.textContent = '⚠️ 加载超时，部分数据可能不完整';
     }
-    
-    // 全局点击金币飞行效果
-    document.addEventListener('click', (e) => {
-      if (e.target.classList.contains('btn-primary') || e.target.classList.contains('action-btn')) {
-        this.spawnCoinFly(e.clientX, e.clientY);
-      }
-    });
+
+    this.appReady = true;
+
+    // 恢复登录状态（数据已就绪）
+    this.restoreLoginState();
+
+    // 淡出加载画面
+    const splash = document.getElementById('loading-splash');
+    if (splash) {
+      splash.style.opacity = '0';
+      setTimeout(() => splash.remove(), 500);
+    }
 
     // 关闭/刷新页面时自动推送操作记录到云端
     this._unloadHandler = () => {
@@ -243,40 +261,50 @@ const App = {
   
   template: `
     <div id="root">
-      <!-- 顶部导航（登录后显示）：仅显示系统类型标签 + 退出按钮 -->
-      <div v-if="isLoggedIn" style="position:fixed;top:20px;right:20px;z-index:1000;display:flex;align-items:center;gap:8px;">
-        <!-- 系统类型标签 -->
-        <div style="background:white;padding:7px 14px;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,0.1);">
-          <span style="font-size:14px;font-weight:700;color:var(--text-dark);">
-            {{ appMode === 'admin' ? '🛡️ 管理后台' : appMode === 'teacher' ? '👩‍🏫 教师系统' : '👨‍🎓 学生系统' }}
-          </span>
+      <!-- 未就绪时 Vue 侧不渲染（由 index.html loading-splash 覆盖） -->
+      <template v-if="appReady">
+        <!-- 顶部导航（登录后显示）：系统类型标签 + 退出/返回按钮 -->
+        <div v-if="isLoggedIn" style="position:fixed;top:20px;right:20px;z-index:1000;display:flex;align-items:center;gap:8px;">
+          <!-- 系统类型标签 -->
+          <div style="background:white;padding:7px 14px;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,0.1);">
+            <span style="font-size:14px;font-weight:700;color:var(--text-dark);" v-if="!teacherPreview">
+              {{ appMode === 'admin' ? '🛡️ 管理后台' : appMode === 'teacher' ? '👩‍🏫 教师系统' : '👨‍🎓 学生系统' }}
+            </span>
+            <span style="font-size:14px;font-weight:700;color:var(--text-dark);" v-else>
+              👁️ 预览：{{ currentUser.name }}
+            </span>
+          </div>
+          <!-- 教师预览模式 → 返回按钮；否则 → 退出按钮 -->
+          <button v-if="teacherPreview" class="btn btn-sm" style="color:var(--primary);border-color:var(--primary);background:white;box-shadow:0 4px 20px rgba(0,0,0,0.1);"
+                  @click="logout" title="返回教师端">
+            ↩️ 返回教师端
+          </button>
+          <button v-else class="btn btn-sm btn-ghost" style="color:#F44336;border-color:#F44336;background:white;box-shadow:0 4px 20px rgba(0,0,0,0.1);"
+                  @click="logout" title="退出登录">
+            🚪
+          </button>
         </div>
-        <!-- 退出按钮 -->
-        <button class="btn btn-sm btn-ghost" style="color:#F44336;border-color:#F44336;background:white;box-shadow:0 4px 20px rgba(0,0,0,0.1);"
-                @click="logout" title="退出登录">
-          🚪
-        </button>
-      </div>
 
-      <!-- 登录页面 -->
-      <login-page v-if="!isLoggedIn" @login-success="onLoginSuccess"></login-page>
+        <!-- 登录页面 -->
+        <login-page v-if="!isLoggedIn" @login-success="onLoginSuccess"></login-page>
 
-      <!-- 学生端 -->
-      <student-app v-else-if="appMode==='student'" :user="currentUser" @logout="logout"></student-app>
+        <!-- 学生端 -->
+        <student-app v-else-if="appMode==='student'" :user="currentUser" @logout="logout"></student-app>
 
-      <!-- 教师端 -->
-      <teacher-app v-else-if="appMode==='teacher'" :user="currentUser" @logout="logout"></teacher-app>
+        <!-- 教师端 -->
+        <teacher-app v-else-if="appMode==='teacher'" :user="currentUser" @logout="logout" @view-as-student="viewAsStudent"></teacher-app>
 
-      <!-- 管理员端 -->
-      <admin-app v-else-if="appMode==='admin'" :user="currentUser" @logout="logout"></admin-app>
+        <!-- 管理员端 -->
+        <admin-app v-else-if="appMode==='admin'" :user="currentUser" @logout="logout" @view-as-student="viewAsStudent"></admin-app>
 
-      <!-- Toast 通知 -->
-      <div class="toast-container">
-        <div v-for="toast in toasts" :key="toast.id" class="toast" :class="'toast-'+toast.type">
-          <span>{{ {success:'✅', error:'❌', warning:'⚠️', info:'💬'}[toast.type] || '💬' }}</span>
-          <span>{{ toast.msg }}</span>
+        <!-- Toast 通知 -->
+        <div class="toast-container">
+          <div v-for="toast in toasts" :key="toast.id" class="toast" :class="'toast-'+toast.type">
+            <span>{{ {success:'✅', error:'❌', warning:'⚠️', info:'💬'}[toast.type] || '💬' }}</span>
+            <span>{{ toast.msg }}</span>
+          </div>
         </div>
-      </div>
+      </template>
     </div>
   `
 };

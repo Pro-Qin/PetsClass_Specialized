@@ -422,15 +422,15 @@ const PetPage = {
             </button>
           </div>
 
-          <div class="pet-name">{{ student.petName || '我的宠物' }} {{ student.petDead ? '💀' : mood.emoji }}</div>
+          <div class="pet-name">{{ student.petName || '我的宠物' }} {{ student.petDead ? '😴' : mood.emoji }}</div>
           <!-- 宠物归属 -->
           <div style="color:var(--text-light);font-size:12px;margin-bottom:4px;">
             🏠 属于 {{ student.name }}
           </div>
           <div style="color:var(--text-light);font-size:13px;margin-bottom:8px;">
             <template v-if="student.petDead">
-              <span style="color:#F44336;">宠物已死亡...</span><br>
-              <span>喂食可以复活宠物（经验将清零）</span>
+              <span style="color:#FF9800;">宠物需要休息 😴</span><br>
+              <span>喂食可以唤醒宠物（经验将清零）</span>
             </template>
             <template v-else>{{ mood.label }} - {{ moodReason }}</template>
           </div>
@@ -1916,47 +1916,10 @@ const StudentApp = {
         <div style="font-size:60px;margin-top:10px;">{{ student && getStudentPetEmoji(student) }}</div>
       </div>
 
-      <!-- 💀 宠物死亡弹窗 -->
-      <div v-if="showPetDeadNotify" class="modal-overlay" style="z-index:9999;background:rgba(0,0,0,0.75);"
-           @click.self="showPetDeadNotify=false">
-        <div class="modal-box" style="text-align:center;max-width:320px;padding:32px 24px;">
-          <div style="font-size:64px;margin-bottom:8px;animation:petFloat 2s ease-in-out infinite;">💀</div>
-          <div style="font-size:20px;font-weight:900;color:#E53935;margin-bottom:8px;">宠物已死亡...</div>
-          <div style="font-size:14px;color:var(--text-mid);line-height:1.6;margin-bottom:12px;">
-            超过 <strong>14天</strong> 没有互动了<br>
-            宠物进入了永恒的沉睡 😢<br>
-            <span v-if="petDeadInfo && petDeadInfo.pointLost > 0" style="color:#F44336;">
-              你损失了 {{ petDeadInfo.pointLost }} 积分（全部清零）
-            </span>
-          </div>
-          <div style="background:#FFEBEE;border-radius:12px;padding:12px;margin-bottom:16px;font-size:13px;color:#C62828;">
-            ⚠️ 喂食可以复活宠物，但经验会清零！<br>
-            等级将重置为0级，重新开始成长。
-          </div>
-          <button class="btn btn-primary" style="width:100%;" @click="showPetDeadNotify=false;navTo('pet')">
-            去喂食复活宠物 🐾
-          </button>
-        </div>
-      </div>
+      <!-- 💤 宠物休息弹窗（已禁用死亡，此弹窗不再显示） -->
+      <!-- showPetDeadNotify 保留变量以避免代码报错，但永远不触发 -->
 
-      <!-- ⚠️ 离线惩罚通知（未死亡，积分扣减） -->
-      <transition name="slide-up">
-        <div v-if="showPenaltyNotify && penaltyInfo" class="points-notify-popup"
-             style="background:linear-gradient(135deg,#FF6F00,#E65100);"
-             @click="showPenaltyNotify=false">
-          <div class="points-notify-inner">
-            <div style="font-size:36px;margin-bottom:4px;">⚠️</div>
-            <div style="font-size:16px;font-weight:900;color:white;margin-bottom:4px;">
-              宠物 {{ penaltyInfo.daysMissed }} 天没吃饭！
-            </div>
-            <div style="font-size:13px;color:rgba(255,255,255,0.9);line-height:1.6;">
-              <span v-if="penaltyInfo.pointPenalty > 0">积分 -{{ penaltyInfo.pointPenalty }}（当前 {{ penaltyInfo.newPoints }} 分）</span><br>
-              快去喂食，再不喂宠物会饿死！
-            </div>
-            <div style="font-size:11px;color:rgba(255,255,255,0.7);margin-top:8px;">点击关闭</div>
-          </div>
-        </div>
-      </transition>
+      <!-- ⚠️ 离线惩罚通知（已禁用，不再显示） -->
 
       <!-- 积分到账/扣除弹窗 -->
       <transition name="slide-up">

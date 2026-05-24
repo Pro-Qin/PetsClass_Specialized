@@ -95,9 +95,14 @@ const CloudSync = {
         }
       }
 
-      // 5. 更新同步时间戳
+      // 5. 更新云端同步时间戳
       const now = new Date().toISOString();
       await sb.from('sync_meta').upsert({ key: 'last_sync', value: now }, { onConflict: 'key' });
+
+      // 6. 主数据（students + tasks）全部上传成功后，才更新本地 IndexedDB 时间戳
+      // 头像失败不影响时间戳（头像是附加数据）
+      if (studentsData.length > 0) await dbStorage.storeMeta('studentsUpdatedAt', now);
+      if (tasksData.length > 0)    await dbStorage.storeMeta('tasksUpdatedAt', now);
 
       console.log('[CloudSync] 上传成功', { students: studentsData.length, tasks: tasksData.length, avatars: avatarCount });
       return {
@@ -110,35 +115,138 @@ const CloudSync = {
     }
   },
 
+  // ---- 获取云端数据最新更新时间 ----
+  async getCloudLastUpdateTime() {
+    try {
+      const sb = getSupabase();
+      if (!sb) return null;
+
+      // 获取 students 表最新时间
+      const { data: sData } = await sb
+        .from('students')
+        .select('updated_at')
+        .order('updated_at', { ascending: false })
+        .limit(1);
+
+      // 获取 tasks 表最新时间
+      const { data: tData } = await sb
+        .from('tasks')
+        .select('updated_at')
+        .order('updated_at', { ascending: false })
+        .limit(1);
+
+      const studentsMax = sData && sData.length > 0 ? new Date(sData[0].updated_at) : null;
+      const tasksMax = tData && tData.length > 0 ? new Date(tData[0].updated_at) : null;
+
+      return {
+        students: studentsMax,
+        tasks: tasksMax,
+      };
+    } catch (e) {
+      console.warn('[CloudSync] 获取云端更新时间失败:', e.message);
+      return null;
+    }
+  },
+
+  // ---- 获取云端"最后更新时间"（综合两个表，取最新）----
+  async getCloudLastSyncTime() {
+    const times = await this.getCloudLastUpdateTime();
+    if (!times) return null;
+    const all = [times.students, times.tasks].filter(Boolean);
+    if (all.length === 0) return null;
+    return new Date(Math.max(...all.map(t => t.getTime())));
+  },
+
   // 从云端拉取数据（覆盖本地）
-  // 头像（avatar/petImage）单独存在 sync_meta.avatars，拉取后合并回 students
-  async pullFromCloud() {
+  // @param force - 是否强制拉取（忽略时间检测）
+  // @returns { success, msg, skipped, studentsUpdated, tasksUpdated }
+  async pullFromCloud(force = false) {
     try {
       const sb = getSupabase();
       if (!sb) return { success: false, msg: 'SDK 未就绪' };
 
-      // 1. 拉取 students
-      const { data: rawStudents, error: sErr } = await sb
-        .from('students')
-        .select('data')
-        .order('id', { ascending: true });
+      // ---- 非强制模式：时间戳冲突检测 ----
+      let studentsUpdated = true;
+      let tasksUpdated = true;
 
-      if (sErr) throw new Error('拉取学生数据失败: ' + sErr.message);
+      if (!force) {
+        try {
+          // 获取本地时间戳
+          const localStudentsTime = await dbStorage.getMeta('studentsUpdatedAt');
+          const localTasksTime = await dbStorage.getMeta('tasksUpdatedAt');
+          
+          // 获取云端最新时间
+          const cloudTimes = await this.getCloudLastUpdateTime();
+          
+          if (cloudTimes) {
+            // 学生数据：云端有新数据才拉取
+            if (localStudentsTime && cloudTimes.students) {
+              const localTime = new Date(localStudentsTime);
+              if (cloudTimes.students <= localTime) {
+                studentsUpdated = false;
+                console.log('[CloudSync] 学生数据未更新，跳过（本地:', localStudentsTime, '≥ 云端:', cloudTimes.students.toISOString(), ')');
+              }
+            }
+            
+            // 任务数据：云端有新数据才拉取
+            if (localTasksTime && cloudTimes.tasks) {
+              const localTime = new Date(localTasksTime);
+              if (cloudTimes.tasks <= localTime) {
+                tasksUpdated = false;
+                console.log('[CloudSync] 任务数据未更新，跳过（本地:', localTasksTime, '≥ 云端:', cloudTimes.tasks.toISOString(), ')');
+              }
+            }
+            
+            // 两种数据都没更新 -> 整体跳过
+            if (!studentsUpdated && !tasksUpdated) {
+              console.log('[CloudSync] 云端数据未更新，无需拉取');
+              return {
+                success: true,
+                skipped: true,
+                msg: '本地数据已是最新，无需拉取云端数据',
+              };
+            }
+          }
+        } catch (e) {
+          console.warn('[CloudSync] 时间检测失败，强制拉取:', e.message);
+          // 时间检测失败时仍继续拉取
+        }
+      } else {
+        console.log('[CloudSync] 强制拉取模式，跳过时间检测');
+      }
 
-      // 2. 拉取 tasks
-      const { data: rawTasks, error: tErr } = await sb
-        .from('tasks')
-        .select('data')
-        .order('id', { ascending: true });
-
-      if (tErr) throw new Error('拉取任务数据失败: ' + tErr.message);
-
-      // 3. 从 data 字段中提取完整对象
-      let studentsData = (rawStudents || []).map(r => r.data);
-      const tasksData = (rawTasks || []).map(r => r.data);
-
-      // 4. 拉取并合并头像数据
+      // ---- 实际拉取逻辑 ----
+      let studentsData = [];
+      let tasksData = [];
       let avatarCount = 0;
+
+      // 1. 拉取 students（如需更新）
+      if (studentsUpdated) {
+        const { data: rawStudents, error: sErr } = await sb
+          .from('students')
+          .select('data')
+          .order('id', { ascending: true });
+        if (sErr) throw new Error('拉取学生数据失败: ' + sErr.message);
+        studentsData = (rawStudents || []).map(r => r.data);
+      } else {
+        // 保留本地数据
+        studentsData = await dbStorage.getStudents();
+      }
+
+      // 2. 拉取 tasks（如需更新）
+      if (tasksUpdated) {
+        const { data: rawTasks, error: tErr } = await sb
+          .from('tasks')
+          .select('data')
+          .order('id', { ascending: true });
+        if (tErr) throw new Error('拉取任务数据失败: ' + tErr.message);
+        tasksData = (rawTasks || []).map(r => r.data);
+      } else {
+        // 保留本地数据
+        tasksData = await dbStorage.getTasks();
+      }
+
+      // 3. 拉取并合并头像数据（始终拉取，因为头像较小）
       try {
         const { data: avatarMeta } = await sb
           .from('sync_meta')
@@ -151,35 +259,41 @@ const CloudSync = {
             const avatarData = avatarMap[s.id] || avatarMap[String(s.id)];
             if (avatarData) {
               avatarCount++;
-              return { ...s, ...avatarData }; // 合并 avatar / petImage
+              return { ...s, ...avatarData };
             }
             return s;
           });
           console.log('[CloudSync] 已合并头像数据，含头像学生数:', avatarCount);
         }
       } catch (e) {
-        // 头像拉取失败不中断主流程
         console.warn('[CloudSync] 头像数据拉取失败（忽略）:', e.message);
       }
 
-      // 5. 写入本地 IndexedDB
+      // 4. 写入本地 IndexedDB（由 storeStudents/storeTasks 自动更新本地时间戳）
       await dbStorage.storeStudents(studentsData);
       await dbStorage.storeTasks(tasksData);
 
-      // 6. 更新 Store 内存状态
+      // 5. 更新 Store 内存状态
       Store.state.students.splice(0, Store.state.students.length, ...studentsData);
       Store.state.tasks.splice(0, Store.state.tasks.length, ...tasksData);
       Store.state.taskRev++;
       Store.state.studentRev++;
 
-      // 7. 更新同步时间戳
+      // 6. 更新同步时间戳
       const now = new Date().toISOString();
       await sb.from('sync_meta').upsert({ key: 'last_sync', value: now }, { onConflict: 'key' });
 
-      console.log('[CloudSync] 拉取成功', { students: studentsData.length, tasks: tasksData.length, avatars: avatarCount });
+      const updateInfo = [];
+      if (studentsUpdated) updateInfo.push('学生');
+      if (tasksUpdated) updateInfo.push('任务');
+      
+      console.log('[CloudSync] 拉取成功', { students: studentsData.length, tasks: tasksData.length, avatars: avatarCount, updated: updateInfo });
       return {
         success: true,
-        msg: `拉取成功！学生 ${studentsData.length} 条，任务 ${tasksData.length} 条${avatarCount > 0 ? `，已恢复 ${avatarCount} 个头像` : ''}`,
+        skipped: false,
+        studentsUpdated,
+        tasksUpdated,
+        msg: `拉取成功！${updateInfo.join('、')}数据已更新，学生 ${studentsData.length} 条，任务 ${tasksData.length} 条${avatarCount > 0 ? `，已恢复 ${avatarCount} 个头像` : ''}`,
       };
     } catch (e) {
       console.error('[CloudSync] 拉取失败:', e);
